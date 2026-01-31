@@ -1,0 +1,1417 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WMS — Fulfillment Dashboard</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+        background: #0a0a0a;
+        color: #e5e5e5;
+        min-height: 100vh;
+        font-size: 13px;
+      }
+      .mono {
+        font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      }
+
+      /* ─── Header ─── */
+      .header {
+        padding: 12px 20px;
+        border-bottom: 1px solid #1a1a1a;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .header h1 {
+        font-size: 15px;
+        font-weight: 600;
+        color: #fff;
+      }
+      .conn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: #525252;
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #ef4444;
+        transition: background 0.3s;
+      }
+      .dot.on {
+        background: #22c55e;
+      }
+
+      /* ─── Tabs ─── */
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid #1a1a1a;
+        padding: 0 20px;
+        background: #0a0a0a;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .tab {
+        padding: 10px 16px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #525252;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: all 0.15s;
+      }
+      .tab:hover {
+        color: #a3a3a3;
+      }
+      .tab.active {
+        color: #3b82f6;
+        border-bottom-color: #3b82f6;
+      }
+      .tab-badge {
+        display: inline-block;
+        padding: 1px 5px;
+        border-radius: 8px;
+        font-size: 10px;
+        background: #1e3a5f;
+        color: #93c5fd;
+        margin-left: 6px;
+      }
+
+      /* ─── Tab Panels ─── */
+      .tab-panel {
+        display: none;
+        height: calc(100vh - 93px);
+      }
+      .tab-panel.active {
+        display: grid;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+       TAB 1: FULFILLMENT
+    ══════════════════════════════════════════════════════════ */
+      .fulfill-layout {
+        grid-template-columns: 280px 1fr 360px;
+      }
+
+      .panel {
+        border-right: 1px solid #1a1a1a;
+        overflow-y: auto;
+      }
+      .panel:last-child {
+        border-right: none;
+      }
+      .panel-hdr {
+        padding: 10px 14px;
+        border-bottom: 1px solid #1a1a1a;
+        position: sticky;
+        top: 0;
+        background: #0a0a0a;
+        z-index: 1;
+      }
+      .stitle {
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: #404040;
+      }
+
+      /* Controls */
+      .ctrls {
+        padding: 14px;
+      }
+      .btn-row {
+        display: flex;
+        gap: 5px;
+        margin-bottom: 6px;
+      }
+      .btn {
+        flex: 1;
+        padding: 9px 10px;
+        border: none;
+        border-radius: 5px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.12s;
+      }
+      .btn:active {
+        transform: scale(0.97);
+      }
+      .btn-b {
+        background: #2563eb;
+        color: #fff;
+      }
+      .btn-b:hover {
+        background: #1d4ed8;
+      }
+      .btn-p {
+        background: #7c3aed;
+        color: #fff;
+      }
+      .btn-p:hover {
+        background: #6d28d9;
+      }
+      .btn-g {
+        background: transparent;
+        color: #525252;
+        border: 1px solid #1f1f1f;
+      }
+      .btn-g:hover {
+        background: #111;
+        color: #a3a3a3;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 5px;
+        margin: 10px 0;
+      }
+      .st {
+        background: #111;
+        border-radius: 5px;
+        padding: 8px;
+        text-align: center;
+      }
+      .st-v {
+        font-size: 18px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .st-l {
+        font-size: 8px;
+        color: #404040;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-top: 1px;
+      }
+
+      /* Product list */
+      .prod {
+        padding: 7px 14px;
+        border-bottom: 1px solid #0f0f0f;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 11px;
+      }
+      .prod:hover {
+        background: #0f0f0f;
+      }
+      .prod-n {
+        color: #c4c4c4;
+        font-weight: 500;
+      }
+      .prod-s {
+        color: #404040;
+        font-size: 9px;
+      }
+      .prod-q {
+        text-align: right;
+      }
+      .qty {
+        color: #22c55e;
+      }
+      .qty.low {
+        color: #f59e0b;
+      }
+      .qty.crit {
+        color: #ef4444;
+      }
+      .rsv {
+        color: #404040;
+        font-size: 9px;
+      }
+      .bar {
+        width: 50px;
+        height: 2px;
+        background: #1a1a1a;
+        border-radius: 1px;
+        margin-top: 2px;
+        overflow: hidden;
+      }
+      .bar-f {
+        height: 100%;
+        border-radius: 1px;
+        transition:
+          width 0.4s,
+          background 0.3s;
+      }
+
+      /* Event feed */
+      .feed-f {
+        display: flex;
+        gap: 3px;
+        padding: 6px 14px;
+      }
+      .ch {
+        padding: 2px 7px;
+        border-radius: 3px;
+        font-size: 9px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid #1a1a1a;
+        background: transparent;
+        color: #404040;
+        transition: all 0.12s;
+      }
+      .ch.act {
+        background: #1e3a5f;
+        border-color: #2563eb;
+        color: #93c5fd;
+      }
+      .ch:hover {
+        border-color: #333;
+        color: #666;
+      }
+
+      .ev {
+        padding: 8px 14px;
+        border-bottom: 1px solid #0f0f0f;
+        animation: si 0.15s ease-out;
+      }
+      .ev.fl {
+        animation: fl 0.5s ease-out;
+      }
+      @keyframes si {
+        from {
+          opacity: 0;
+          transform: translateY(-4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes fl {
+        0% {
+          background: #1e3a5f;
+        }
+        100% {
+          background: transparent;
+        }
+      }
+
+      .ev-r {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .ev-t {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        font-weight: 500;
+      }
+      .ev-tm {
+        font-size: 9px;
+        color: #333;
+      }
+      .ev-d {
+        font-size: 10px;
+        color: #404040;
+        margin-top: 2px;
+      }
+      .pb {
+        margin-top: 3px;
+        height: 2px;
+        background: #1a1a1a;
+        border-radius: 1px;
+        overflow: hidden;
+      }
+      .pb-f {
+        height: 100%;
+        background: #3b82f6;
+        border-radius: 1px;
+        transition: width 0.3s;
+      }
+
+      /* Badges */
+      .bg {
+        display: inline-block;
+        padding: 1px 5px;
+        border-radius: 2px;
+        font-size: 8px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .bg-ord {
+        background: #1e3a5f;
+        color: #93c5fd;
+      }
+      .bg-proc {
+        background: #1a3329;
+        color: #86efac;
+      }
+      .bg-pick {
+        background: #362e1a;
+        color: #fcd34d;
+      }
+      .bg-pack {
+        background: #2d1f4e;
+        color: #c4b5fd;
+      }
+      .bg-ship {
+        background: #1a3347;
+        color: #7dd3fc;
+      }
+      .bg-done {
+        background: #14352a;
+        color: #34d399;
+      }
+      .bg-fail {
+        background: #3b1a1a;
+        color: #fca5a5;
+      }
+      .bg-inv {
+        background: #332b1a;
+        color: #fbbf24;
+      }
+      .bg-task {
+        background: #1a1a2e;
+        color: #a5b4fc;
+      }
+      .bg-scan {
+        background: #2e2a1a;
+        color: #fde68a;
+      }
+      .bg-vrfy {
+        background: #1f2d1a;
+        color: #bbf7d0;
+      }
+      .bg-lbl {
+        background: #1a2d33;
+        color: #67e8f9;
+      }
+
+      .empty {
+        padding: 30px 14px;
+        text-align: center;
+        color: #262626;
+        font-size: 12px;
+      }
+      .empty span {
+        display: block;
+        font-size: 24px;
+        margin-bottom: 6px;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+       ORDER DETAIL PANEL (Right)
+    ══════════════════════════════════════════════════════════ */
+      .order-list {
+      }
+
+      .o-card {
+        margin: 8px 12px;
+        padding: 0;
+        background: #0f0f0f;
+        border: 1px solid #1a1a1a;
+        border-radius: 6px;
+        overflow: hidden;
+        animation: si 0.2s ease-out;
+        transition: border-color 0.3s;
+      }
+      .o-card.active-order {
+        border-color: #2563eb33;
+      }
+
+      .o-head {
+        padding: 10px 12px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .o-head:hover {
+        background: #141414;
+      }
+      .o-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .o-num {
+        font-weight: 600;
+        color: #e5e5e5;
+        font-size: 12px;
+      }
+      .o-amt {
+        color: #22c55e;
+        font-weight: 600;
+        font-size: 12px;
+      }
+      .o-cust {
+        color: #525252;
+        font-size: 10px;
+        margin-top: 1px;
+      }
+
+      /* Status progress bar */
+      .o-prog {
+        display: flex;
+        gap: 2px;
+        margin-top: 8px;
+      }
+      .o-step {
+        flex: 1;
+        height: 3px;
+        border-radius: 1px;
+        background: #1a1a1a;
+        transition: background 0.4s;
+        position: relative;
+      }
+      .o-step.done {
+        background: #22c55e;
+      }
+      .o-step.cur {
+        background: #3b82f6;
+      }
+      .o-step-labels {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 3px;
+      }
+      .o-step-lbl {
+        font-size: 7px;
+        color: #333;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        text-align: center;
+        flex: 1;
+      }
+      .o-step-lbl.done {
+        color: #22c55e;
+      }
+      .o-step-lbl.cur {
+        color: #3b82f6;
+      }
+
+      /* Expandable detail */
+      .o-detail {
+        display: none;
+        border-top: 1px solid #1a1a1a;
+      }
+      .o-detail.open {
+        display: block;
+      }
+
+      .o-section {
+        padding: 8px 12px;
+        border-bottom: 1px solid #111;
+      }
+      .o-sec-title {
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #404040;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .o-sec-title .ico {
+        font-size: 12px;
+      }
+
+      /* Pick list items */
+      .pick-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0;
+        font-size: 11px;
+      }
+      .pick-check {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        border: 1.5px solid #333;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: all 0.2s;
+      }
+      .pick-check.picked {
+        background: #22c55e;
+        border-color: #22c55e;
+      }
+      .pick-check.picked::after {
+        content: "✓";
+        color: #000;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .pick-sku {
+        color: #93c5fd;
+        font-weight: 500;
+        width: 52px;
+      }
+      .pick-name {
+        color: #a3a3a3;
+        flex: 1;
+      }
+      .pick-qty {
+        color: #737373;
+        width: 24px;
+        text-align: center;
+      }
+      .pick-loc {
+        color: #fbbf24;
+        font-size: 9px;
+        padding: 1px 5px;
+        background: #332b1a;
+        border-radius: 2px;
+      }
+
+      /* Pack items */
+      .pack-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0;
+        font-size: 11px;
+      }
+      .pack-check {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        border: 1.5px solid #333;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: all 0.2s;
+      }
+      .pack-check.verified {
+        background: #a78bfa;
+        border-color: #a78bfa;
+      }
+      .pack-check.verified::after {
+        content: "✓";
+        color: #000;
+        font-size: 10px;
+        font-weight: 700;
+      }
+
+      /* Package info */
+      .pkg-info {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        margin-top: 6px;
+      }
+      .pkg-stat {
+        background: #111;
+        border-radius: 4px;
+        padding: 6px 8px;
+      }
+      .pkg-val {
+        font-size: 13px;
+        font-weight: 600;
+        color: #e5e5e5;
+      }
+      .pkg-lbl {
+        font-size: 8px;
+        color: #404040;
+        text-transform: uppercase;
+      }
+
+      /* Shipping label */
+      .ship-label {
+        background: #111;
+        border: 1px dashed #333;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 4px;
+      }
+      .ship-carrier {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .ship-carrier-name {
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #fff;
+      }
+      .ship-service {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        background: #1a3347;
+        color: #7dd3fc;
+        font-weight: 600;
+      }
+      .ship-tracking {
+        font-size: 14px;
+        font-weight: 600;
+        color: #67e8f9;
+        letter-spacing: 0.02em;
+        margin: 6px 0;
+      }
+      .ship-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: #525252;
+      }
+      .ship-rate {
+        color: #22c55e;
+        font-weight: 600;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+       TAB 2: EVENT LOG (full width)
+    ══════════════════════════════════════════════════════════ */
+      .log-layout {
+        grid-template-columns: 1fr;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+       TAB 3: INVENTORY (full width)
+    ══════════════════════════════════════════════════════════ */
+      .inv-layout {
+        grid-template-columns: 1fr;
+      }
+      .inv-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 8px;
+        padding: 14px;
+      }
+      .inv-card {
+        background: #0f0f0f;
+        border: 1px solid #1a1a1a;
+        border-radius: 6px;
+        padding: 12px;
+        transition: border-color 0.2s;
+      }
+      .inv-card:hover {
+        border-color: #333;
+      }
+      .inv-name {
+        font-weight: 600;
+        color: #e5e5e5;
+        margin-bottom: 2px;
+      }
+      .inv-sku {
+        color: #525252;
+        font-size: 10px;
+      }
+      .inv-loc {
+        color: #fbbf24;
+        font-size: 10px;
+        margin-top: 4px;
+      }
+      .inv-bar-wrap {
+        margin-top: 8px;
+      }
+      .inv-bar {
+        height: 4px;
+        background: #1a1a1a;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .inv-bar-f {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.4s;
+      }
+      .inv-nums {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 4px;
+        font-size: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>📦 WMS Fulfillment Dashboard</h1>
+      <div class="conn">
+        <div class="dot" id="dot"></div>
+        <span id="connTxt">Connecting...</span>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('fulfill', this)">
+        Fulfillment <span class="tab-badge" id="tabActiveCount">0</span>
+      </div>
+      <div class="tab" onclick="switchTab('log', this)">
+        Event Log <span class="tab-badge" id="tabEventCount">0</span>
+      </div>
+      <div class="tab" onclick="switchTab('inventory', this)">
+        Inventory <span class="tab-badge" id="tabProductCount">0</span>
+      </div>
+    </div>
+
+    <!-- ═══ TAB 1: FULFILLMENT ═══ -->
+    <div class="tab-panel active fulfill-layout" id="panel-fulfill">
+      <!-- Left: Controls -->
+      <div class="panel">
+        <div class="panel-hdr"><div class="stitle">Simulate Orders</div></div>
+        <div class="ctrls">
+          <div class="btn-row">
+            <button class="btn btn-b" onclick="simulateOrder()">
+              + New Order
+            </button>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-p" onclick="burstOrders(3)">
+              🔥 3 Orders
+            </button>
+            <button class="btn btn-p" onclick="burstOrders(5)">
+              🔥 5 Orders
+            </button>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-g" onclick="clearAll()">Clear</button>
+            <button class="btn btn-g" onclick="refreshProducts()">
+              ↻ Refresh
+            </button>
+          </div>
+          <div class="stats">
+            <div class="st">
+              <div class="st-v" id="sOrders">0</div>
+              <div class="st-l">Orders</div>
+            </div>
+            <div class="st">
+              <div class="st-v" id="sFulfilled">0</div>
+              <div class="st-l">Done</div>
+            </div>
+            <div class="st">
+              <div class="st-v" id="sEvents">0</div>
+              <div class="st-l">Events</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-hdr">
+          <div class="stitle">Inventory (<span id="pCount">0</span>)</div>
+        </div>
+        <div id="prodList"></div>
+      </div>
+
+      <!-- Center: Event Feed -->
+      <div class="panel">
+        <div class="panel-hdr"><div class="stitle">Live Feed</div></div>
+        <div class="feed-f">
+          <button class="ch act" onclick="setFilter('all', this)">All</button>
+          <button class="ch" onclick="setFilter('order', this)">Orders</button>
+          <button class="ch" onclick="setFilter('pick', this)">Picking</button>
+          <button class="ch" onclick="setFilter('pack', this)">Packing</button>
+          <button class="ch" onclick="setFilter('ship', this)">Shipping</button>
+          <button class="ch" onclick="setFilter('inv', this)">Inventory</button>
+        </div>
+        <div id="feed">
+          <div class="empty"><span>📡</span>Click "New Order" to start</div>
+        </div>
+      </div>
+
+      <!-- Right: Order Details -->
+      <div class="panel">
+        <div class="panel-hdr"><div class="stitle">Orders</div></div>
+        <div id="orderList">
+          <div class="empty"><span>🛒</span>No orders yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB 2: EVENT LOG ═══ -->
+    <div class="tab-panel log-layout" id="panel-log">
+      <div class="panel">
+        <div class="panel-hdr"><div class="stitle">Full Event Log</div></div>
+        <div id="fullLog">
+          <div class="empty"><span>📋</span>Events will appear here</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB 3: INVENTORY ═══ -->
+    <div class="tab-panel inv-layout" id="panel-inventory">
+      <div class="panel">
+        <div class="panel-hdr"><div class="stitle">Product Inventory</div></div>
+        <div class="inv-grid" id="invGrid"></div>
+      </div>
+    </div>
+
+    <script>
+      const API = window.location.origin;
+      let events = [];
+      let orders = new Map();
+      let products = [];
+      let filter = "all";
+      let stats = { orders: 0, fulfilled: 0, events: 0 };
+      let expandedOrder = null;
+
+      const STEPS = [
+        "pending",
+        "processing",
+        "picking",
+        "picked",
+        "packed",
+        "shipped",
+        "completed",
+      ];
+      const STEP_LABELS = [
+        "New",
+        "Proc",
+        "Pick",
+        "Pickd",
+        "Pack",
+        "Ship",
+        "Done",
+      ];
+
+      // ═══════════════════════════════════════════════════════════
+      // SSE
+      // ═══════════════════════════════════════════════════════════
+      function connectSSE() {
+        const es = new EventSource(`${API}/events`);
+        es.onopen = () => {
+          document.getElementById("dot").classList.add("on");
+          document.getElementById("connTxt").textContent = "Connected";
+        };
+        es.onmessage = (e) => {
+          try {
+            const ev = JSON.parse(e.data);
+            if (ev.type === "connected") return;
+            handleEvent(ev);
+          } catch (err) {
+            console.error(err);
+          }
+        };
+        es.onerror = () => {
+          document.getElementById("dot").classList.remove("on");
+          document.getElementById("connTxt").textContent = "Reconnecting...";
+        };
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // EVENT HANDLER — builds order state from pub/sub events
+      // ═══════════════════════════════════════════════════════════
+      function handleEvent(ev) {
+        events.unshift(ev);
+        stats.events++;
+        const p = ev.payload || {};
+
+        // ─── Order lifecycle ───
+        if (ev.type === "order:created") {
+          stats.orders++;
+          orders.set(p.orderNumber, {
+            orderNumber: p.orderNumber,
+            customer: p.customerName,
+            amount: p.totalAmount,
+            itemCount: p.itemCount,
+            priority: p.priority,
+            status: "pending",
+            pickItems: [],
+            packItems: [],
+            pickTotal: 0,
+            pickDone: 0,
+            packTotal: 0,
+            packDone: 0,
+            weight: null,
+            dimensions: null,
+            label: null,
+            message: null,
+          });
+        }
+
+        // Order status transitions
+        if (
+          ev.type?.startsWith("order:") &&
+          p.orderNumber &&
+          orders.has(p.orderNumber)
+        ) {
+          const o = orders.get(p.orderNumber);
+          const s = p.status || ev.type.replace("order:", "");
+          o.status = s;
+          o.message = p.message;
+          if (s === "completed") stats.fulfilled++;
+        }
+
+        // ─── Pick list ───
+        if (
+          ev.type === "picklist:generated" &&
+          p.orderNumber &&
+          orders.has(p.orderNumber)
+        ) {
+          const o = orders.get(p.orderNumber);
+          o.pickItems = (p.items || []).map((i) => ({ ...i, picked: false }));
+          o.pickTotal = o.pickItems.length;
+          o.pickDone = 0;
+        }
+
+        if (
+          ev.type === "picklist:item_picked" &&
+          p.orderNumber &&
+          orders.has(p.orderNumber)
+        ) {
+          const o = orders.get(p.orderNumber);
+          const item = o.pickItems.find((i) => i.sku === p.sku && !i.picked);
+          if (item) item.picked = true;
+          o.pickDone = o.pickItems.filter((i) => i.picked).length;
+        }
+
+        // ─── Packing ───
+        if (
+          ev.type === "packing:started" &&
+          p.orderNumber &&
+          orders.has(p.orderNumber)
+        ) {
+          const o = orders.get(p.orderNumber);
+          o.packItems = o.pickItems.map((i) => ({ ...i, verified: false }));
+          o.packTotal = o.packItems.length;
+          o.packDone = 0;
+        }
+
+        if (
+          ev.type === "packing:item_verified" &&
+          p.orderNumber &&
+          orders.has(p.orderNumber)
+        ) {
+          const o = orders.get(p.orderNumber);
+          const item = o.packItems.find((i) => i.sku === p.sku && !i.verified);
+          if (item) item.verified = true;
+          o.packDone = o.packItems.filter((i) => i.verified).length;
+        }
+
+        if (
+          ev.type === "packing:completed" &&
+          p.orderNumber &&
+          orders.has(p.orderNumber)
+        ) {
+          const o = orders.get(p.orderNumber);
+          o.weight = p.weight;
+          o.dimensions = p.dimensions;
+        }
+
+        // ─── Shipping label ───
+        if (
+          ev.type === "shipping:label_created" &&
+          p.orderNumber &&
+          orders.has(p.orderNumber)
+        ) {
+          const o = orders.get(p.orderNumber);
+          o.label = {
+            carrier: p.carrier,
+            service: p.service,
+            tracking: p.trackingNumber,
+            rate: p.rate,
+            days: p.estimatedDays,
+          };
+        }
+
+        // ─── Inventory ───
+        if (ev.type === "inventory:updated" && p.productId) {
+          const idx = products.findIndex((x) => x.id === p.productId);
+          if (idx >= 0) {
+            products[idx].quantity = p.newQty;
+            products[idx].reserved = p.reserved;
+          }
+        }
+
+        renderAll();
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // RENDER
+      // ═══════════════════════════════════════════════════════════
+      function renderAll() {
+        renderStats();
+        renderFeed();
+        renderOrders();
+        renderProducts();
+        renderFullLog();
+        renderInvGrid();
+      }
+
+      function renderStats() {
+        document.getElementById("sOrders").textContent = stats.orders;
+        document.getElementById("sFulfilled").textContent = stats.fulfilled;
+        document.getElementById("sEvents").textContent = stats.events;
+        document.getElementById("tabActiveCount").textContent =
+          stats.orders - stats.fulfilled;
+        document.getElementById("tabEventCount").textContent = stats.events;
+        document.getElementById("tabProductCount").textContent =
+          products.length;
+      }
+
+      // ─── Event Feed (center panel) ───
+      function renderFeed() {
+        const el = document.getElementById("feed");
+        let filtered = events;
+        if (filter === "order")
+          filtered = events.filter((e) => e.type?.startsWith("order:"));
+        else if (filter === "pick")
+          filtered = events.filter((e) => e.type?.startsWith("picklist:"));
+        else if (filter === "pack")
+          filtered = events.filter((e) => e.type?.startsWith("packing:"));
+        else if (filter === "ship")
+          filtered = events.filter((e) => e.type?.startsWith("shipping:"));
+        else if (filter === "inv")
+          filtered = events.filter((e) => e.type?.includes("inventory"));
+
+        if (!filtered.length) {
+          el.innerHTML = '<div class="empty"><span>📡</span>No events</div>';
+          return;
+        }
+
+        el.innerHTML = filtered
+          .slice(0, 80)
+          .map((ev, i) => {
+            const b = badge(ev.type);
+            const t = new Date(ev.timestamp).toLocaleTimeString();
+            const d = detail(ev);
+            return `<div class="ev ${i === 0 ? "fl" : ""}">
+      <div class="ev-r">
+        <div class="ev-t"><span class="bg ${b.c}">${b.l}</span> ${ev.type}</div>
+        <span class="ev-tm mono">${t}</span>
+      </div>
+      <div class="ev-d mono">${d}</div>
+    </div>`;
+          })
+          .join("");
+      }
+
+      function badge(t) {
+        if (t === "order:created") return { c: "bg-ord", l: "ORDER" };
+        if (t === "order:processing") return { c: "bg-proc", l: "PROC" };
+        if (t === "order:picked") return { c: "bg-pick", l: "PICKD" };
+        if (t === "order:packed") return { c: "bg-pack", l: "PACKD" };
+        if (t === "order:shipped") return { c: "bg-ship", l: "SHIP" };
+        if (t === "order:completed") return { c: "bg-done", l: "DONE" };
+        if (t === "picklist:generated") return { c: "bg-pick", l: "PLIST" };
+        if (t === "picklist:item_picked") return { c: "bg-scan", l: "SCAN" };
+        if (t === "picklist:completed") return { c: "bg-pick", l: "PICK✓" };
+        if (t === "packing:started") return { c: "bg-pack", l: "PACK" };
+        if (t === "packing:item_verified") return { c: "bg-vrfy", l: "VRFY" };
+        if (t === "packing:completed") return { c: "bg-pack", l: "PACK✓" };
+        if (t === "shipping:label_created") return { c: "bg-lbl", l: "LABEL" };
+        if (t === "inventory:updated") return { c: "bg-inv", l: "INV" };
+        if (t?.includes("task")) return { c: "bg-task", l: "TASK" };
+        if (t?.includes("fail")) return { c: "bg-fail", l: "FAIL" };
+        return { c: "", l: "EVT" };
+      }
+
+      function detail(ev) {
+        const p = ev.payload;
+        if (!p) return "";
+        if (ev.type === "order:created")
+          return `${p.customerName} — ${p.itemCount} items — $${p.totalAmount} [${p.priority}]`;
+        if (ev.type === "picklist:generated")
+          return `${p.orderNumber}: ${p.itemCount} items to pick`;
+        if (ev.type === "picklist:item_picked")
+          return `${p.sku} (${p.quantity}x) from ${p.location} — ${p.progress}`;
+        if (ev.type === "picklist:completed")
+          return `${p.orderNumber}: ${p.message}`;
+        if (ev.type === "packing:item_verified")
+          return `${p.sku} verified — ${p.progress}`;
+        if (ev.type === "packing:completed")
+          return `${p.weight}lbs (${p.dimensions?.length}x${p.dimensions?.width}x${p.dimensions?.height}in)`;
+        if (ev.type === "shipping:label_created")
+          return `${p.carrier.toUpperCase()} ${p.service} — ${p.trackingNumber} ($${p.rate})`;
+        if (ev.type?.startsWith("order:") && p.message)
+          return `${p.orderNumber}: ${p.message}`;
+        if (ev.type === "inventory:updated")
+          return `${p.sku}: ${p.previousQty}→${p.newQty} (rsv: ${p.reserved})`;
+        return JSON.stringify(p).slice(0, 60);
+      }
+
+      // ─── Orders (right panel) ───
+      function renderOrders() {
+        const el = document.getElementById("orderList");
+        const arr = Array.from(orders.values()).reverse();
+
+        if (!arr.length) {
+          el.innerHTML =
+            '<div class="empty"><span>🛒</span>No orders yet</div>';
+          return;
+        }
+
+        el.innerHTML = arr
+          .map((o) => {
+            const si = STEPS.indexOf(o.status);
+            const isExpanded = expandedOrder === o.orderNumber;
+
+            // Progress steps
+            const steps = STEPS.map(
+              (s, i) =>
+                `<div class="o-step ${i < si ? "done" : i === si ? "cur" : ""}"></div>`,
+            ).join("");
+            const labels = STEP_LABELS.map(
+              (l, i) =>
+                `<div class="o-step-lbl ${i < si ? "done" : i === si ? "cur" : ""}">${l}</div>`,
+            ).join("");
+
+            // Pick list section
+            let pickHtml = "";
+            if (o.pickItems.length) {
+              pickHtml = `<div class="o-section">
+        <div class="o-sec-title"><span class="ico">📋</span> Pick List (${o.pickDone}/${o.pickTotal})</div>
+        ${o.pickItems
+          .map(
+            (item) => `
+          <div class="pick-item">
+            <div class="pick-check ${item.picked ? "picked" : ""}"></div>
+            <span class="pick-sku mono">${item.sku}</span>
+            <span class="pick-name">${item.name}</span>
+            <span class="pick-qty mono">${item.quantity}x</span>
+            <span class="pick-loc mono">${item.location}</span>
+          </div>
+        `,
+          )
+          .join("")}
+      </div>`;
+            }
+
+            // Pack section
+            let packHtml = "";
+            if (o.packItems.length) {
+              packHtml = `<div class="o-section">
+        <div class="o-sec-title"><span class="ico">📦</span> Packing (${o.packDone}/${o.packTotal})</div>
+        ${o.packItems
+          .map(
+            (item) => `
+          <div class="pack-item">
+            <div class="pack-check ${item.verified ? "verified" : ""}"></div>
+            <span class="pick-sku mono">${item.sku}</span>
+            <span class="pick-name">${item.name}</span>
+            <span class="pick-qty mono">${item.quantity}x</span>
+          </div>
+        `,
+          )
+          .join("")}
+        ${
+          o.weight
+            ? `
+          <div class="pkg-info">
+            <div class="pkg-stat"><div class="pkg-val">${o.weight} lbs</div><div class="pkg-lbl">Weight</div></div>
+            <div class="pkg-stat"><div class="pkg-val">${o.dimensions?.length}×${o.dimensions?.width}×${o.dimensions?.height}</div><div class="pkg-lbl">Dimensions (in)</div></div>
+          </div>
+        `
+            : ""
+        }
+      </div>`;
+            }
+
+            // Shipping label section
+            let shipHtml = "";
+            if (o.label) {
+              shipHtml = `<div class="o-section">
+        <div class="o-sec-title"><span class="ico">🏷️</span> Shipping Label</div>
+        <div class="ship-label">
+          <div class="ship-carrier">
+            <span class="ship-carrier-name">${o.label.carrier}</span>
+            <span class="ship-service">${o.label.service}</span>
+          </div>
+          <div class="ship-tracking mono">${o.label.tracking}</div>
+          <div class="ship-meta">
+            <span>Est. ${o.label.days} day${o.label.days > 1 ? "s" : ""}</span>
+            <span class="ship-rate">$${o.label.rate.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>`;
+            }
+
+            const hasDetail = pickHtml || packHtml || shipHtml;
+
+            return `<div class="o-card ${o.status !== "completed" && o.status !== "pending" ? "active-order" : ""}">
+      <div class="o-head" onclick="toggleOrder('${o.orderNumber}')">
+        <div class="o-top">
+          <div>
+            <div class="o-num">${o.orderNumber} <span class="bg ${badge("order:" + o.status).c}" style="font-size:7px;margin-left:4px">${o.status.toUpperCase()}</span></div>
+            <div class="o-cust">${o.customer} · ${o.itemCount} item(s)</div>
+          </div>
+          <div class="o-amt mono">$${o.amount.toFixed(2)}</div>
+        </div>
+        ${o.message ? `<div class="ev-d" style="margin-top:4px">${o.message}</div>` : ""}
+        <div class="o-prog">${steps}</div>
+        <div class="o-step-labels">${labels}</div>
+      </div>
+      ${hasDetail ? `<div class="o-detail ${isExpanded ? "open" : ""}">${pickHtml}${packHtml}${shipHtml}</div>` : ""}
+    </div>`;
+          })
+          .join("");
+      }
+
+      function toggleOrder(num) {
+        expandedOrder = expandedOrder === num ? null : num;
+        renderOrders();
+      }
+
+      // ─── Products (left panel) ───
+      function renderProducts() {
+        const el = document.getElementById("prodList");
+        document.getElementById("pCount").textContent = products.length;
+        if (!products.length) {
+          el.innerHTML = '<div class="empty">Loading...</div>';
+          return;
+        }
+
+        el.innerHTML = products
+          .map((p) => {
+            const pct = Math.min((p.quantity / 500) * 100, 100);
+            let cls = "",
+              clr = "#22c55e";
+            if (p.quantity < 10) {
+              cls = "crit";
+              clr = "#ef4444";
+            } else if (p.quantity < 30) {
+              cls = "low";
+              clr = "#f59e0b";
+            }
+
+            return `<div class="prod">
+      <div><div class="prod-n">${p.name}</div><div class="prod-s">${p.sku} · ${p.location || "—"}</div></div>
+      <div class="prod-q">
+        <span class="qty ${cls} mono">${p.quantity}</span>
+        ${p.reserved > 0 ? `<span class="rsv mono"> (${p.reserved}r)</span>` : ""}
+        <div class="bar"><div class="bar-f" style="width:${pct}%;background:${clr}"></div></div>
+      </div>
+    </div>`;
+          })
+          .join("");
+      }
+
+      // ─── Full Log (tab 2) ───
+      function renderFullLog() {
+        const el = document.getElementById("fullLog");
+        if (!events.length) {
+          el.innerHTML =
+            '<div class="empty"><span>📋</span>Events will appear here</div>';
+          return;
+        }
+        el.innerHTML = events
+          .slice(0, 200)
+          .map((ev, i) => {
+            const b = badge(ev.type);
+            const t = new Date(ev.timestamp).toLocaleTimeString();
+            return `<div class="ev ${i === 0 ? "fl" : ""}">
+      <div class="ev-r">
+        <div class="ev-t"><span class="bg ${b.c}">${b.l}</span> ${ev.type}</div>
+        <span class="ev-tm mono">${t}</span>
+      </div>
+      <div class="ev-d mono">${detail(ev)}</div>
+    </div>`;
+          })
+          .join("");
+      }
+
+      // ─── Inventory Grid (tab 3) ───
+      function renderInvGrid() {
+        const el = document.getElementById("invGrid");
+        if (!products.length) {
+          el.innerHTML = '<div class="empty">Loading inventory...</div>';
+          return;
+        }
+
+        el.innerHTML = products
+          .map((p) => {
+            const pct = Math.min((p.quantity / 500) * 100, 100);
+            let clr = "#22c55e";
+            if (p.quantity < 10) clr = "#ef4444";
+            else if (p.quantity < 30) clr = "#f59e0b";
+            const rsvPct =
+              p.reserved > 0
+                ? Math.min((p.reserved / (p.quantity + p.reserved)) * 100, 100)
+                : 0;
+
+            return `<div class="inv-card">
+      <div class="inv-name">${p.name}</div>
+      <div class="inv-sku">${p.sku} · $${p.price.toFixed(2)}</div>
+      <div class="inv-loc">📍 ${p.location || "—"}</div>
+      <div class="inv-bar-wrap">
+        <div class="inv-bar"><div class="inv-bar-f" style="width:${pct}%;background:${clr}"></div></div>
+        <div class="inv-nums">
+          <span style="color:${clr}">${p.quantity} in stock</span>
+          ${p.reserved > 0 ? `<span style="color:#f59e0b">${p.reserved} reserved</span>` : `<span style="color:#333">0 reserved</span>`}
+        </div>
+      </div>
+    </div>`;
+          })
+          .join("");
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // ACTIONS
+      // ═══════════════════════════════════════════════════════════
+      async function simulateOrder() {
+        await fetch(`${API}/api/orders/simulate`, { method: "POST" });
+      }
+
+      async function burstOrders(n) {
+        for (let i = 0; i < n; i++) {
+          await fetch(`${API}/api/orders/simulate`, { method: "POST" });
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      }
+
+      async function refreshProducts() {
+        const res = await fetch(`${API}/api/orders/products`);
+        const data = await res.json();
+        if (data.success) {
+          products = data.data;
+          renderAll();
+        }
+      }
+
+      function clearAll() {
+        events = [];
+        orders.clear();
+        expandedOrder = null;
+        stats = { orders: 0, fulfilled: 0, events: 0 };
+        renderAll();
+      }
+
+      function setFilter(f, el) {
+        filter = f;
+        document
+          .querySelectorAll(".ch")
+          .forEach((c) => c.classList.remove("act"));
+        el.classList.add("act");
+        renderFeed();
+      }
+
+      function switchTab(name, el) {
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("active"));
+        document
+          .querySelectorAll(".tab-panel")
+          .forEach((p) => p.classList.remove("active"));
+        el.classList.add("active");
+        document.getElementById("panel-" + name).classList.add("active");
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // INIT
+      // ═══════════════════════════════════════════════════════════
+      connectSSE();
+      refreshProducts();
+    </script>
+  </body>
+</html>

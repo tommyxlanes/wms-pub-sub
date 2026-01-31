@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  name        String
+  status      String   @default("pending") // pending, processing, completed, failed
+  priority    String   @default("normal")   // low, normal, high, critical
+  payload     Json?
+  result      Json?
+  error       String?
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  name        String
+  description String?
+  price       Float
+  quantity    Int      @default(0)
+  reserved    Int      @default(0)
+  location    String?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderLines OrderLine[]
+
+  @@index([sku])
+  @@index([quantity])
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  orderNumber String   @unique
+  status      String   @default("pending") // pending, processing, picked, packed, shipped, completed, cancelled
+  customerName String
+  customerEmail String?
+  totalAmount Float    @default(0)
+  priority    String   @default("normal")
+  notes       String?
+  processedAt DateTime?
+  shippedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines OrderLine[]
+
+  @@index([status])
+  @@index([orderNumber])
+  @@index([createdAt])
+}
+
+model OrderLine {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  picked    Boolean @default(false)
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Event {
+  id            String   @id @default(cuid())
+  type          String
+  payload       Json
+  correlationId String
+  processed     Boolean  @default(false)
+  processedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([type])
+  @@index([correlationId])
+  @@index([processed])
+}
+
+model PickList {
+  id          String   @id @default(cuid())
+  orderId     String
+  status      String   @default("pending") // pending, in_progress, completed
+  assignedTo  String?
+  items       Json     // [{productId, sku, name, quantity, location, picked}]
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model PackingTask {
+  id          String   @id @default(cuid())
+  orderId     String
+  status      String   @default("pending") // pending, in_progress, completed
+  items       Json     // [{productId, sku, name, quantity, verified}]
+  weight      Float?
+  dimensions  Json?    // {length, width, height}
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model ShippingLabel {
+  id              String   @id @default(cuid())
+  orderId         String
+  carrier         String   // usps, ups, fedex
+  service         String   // ground, express, priority
+  trackingNumber  String   @unique
+  labelUrl        String?
+  rate            Float
+  estimatedDays   Int
+  createdAt       DateTime @default(now())
+
+  @@index([orderId])
+  @@index([trackingNumber])
+}

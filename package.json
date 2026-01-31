@@ -1,0 +1,19 @@
+{
+  "name": "pubsub-workers",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter api dev",
+    "dev:worker": "pnpm --filter worker dev",
+    "dev": "pnpm run --parallel dev:api dev:worker",
+    "build": "pnpm -r build",
+    "clean": "pnpm -r exec rm -rf dist",
+    "db:push": "pnpm --filter @wms/db db:push",
+    "db:generate": "pnpm --filter @wms/db db:generate",
+    "db:studio": "pnpm --filter @wms/db db:studio",
+    "db:seed": "pnpm --filter @wms/db db:seed"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
