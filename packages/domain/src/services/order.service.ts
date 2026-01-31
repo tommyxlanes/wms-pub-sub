@@ -21,6 +21,7 @@ export const orderService = {
     customerName: string;
     customerEmail?: string;
     priority?: string;
+    manual?: boolean;
     items: { productId: string; quantity: number }[];
   }) {
     const correlationId = randomUUID();
@@ -93,13 +94,15 @@ export const orderService = {
       correlationId,
     );
 
-    // 5. Enqueue order for fulfillment processing
-    await enqueueTask(order.id, {
-      name: `fulfill-order:${order.orderNumber}`,
-      type: "order-fulfillment",
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-    });
+    // 5. Enqueue order for fulfillment processing (auto mode only)
+    if (!input.manual) {
+      await enqueueTask(order.id, {
+        name: `fulfill-order:${order.orderNumber}`,
+        type: "order-fulfillment",
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+      });
+    }
 
     return { order, correlationId };
   },

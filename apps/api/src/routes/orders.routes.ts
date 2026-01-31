@@ -3,9 +3,16 @@ import { orderService } from "@wms/domain";
 
 // Random customer names for simulation
 const CUSTOMERS = [
-  "Alice Johnson", "Bob Smith", "Carlos Rivera", "Diana Chen",
-  "Erik Larsson", "Fatima Al-Rashid", "Greg Tanaka", "Hannah Kim",
-  "Ivan Petrov", "Julia Santos",
+  "Alice Johnson",
+  "Bob Smith",
+  "Carlos Rivera",
+  "Diana Chen",
+  "Erik Larsson",
+  "Fatima Al-Rashid",
+  "Greg Tanaka",
+  "Hannah Kim",
+  "Ivan Petrov",
+  "Julia Santos",
 ];
 
 export async function orderRoutes(app: FastifyInstance) {
@@ -27,7 +34,9 @@ export async function orderRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const order = await orderService.getById(id);
     if (!order) {
-      return reply.status(404).send({ success: false, error: "Order not found" });
+      return reply
+        .status(404)
+        .send({ success: false, error: "Order not found" });
     }
     return reply.send({ success: true, data: order });
   });
@@ -36,6 +45,48 @@ export async function orderRoutes(app: FastifyInstance) {
   app.get("/products", async (request, reply) => {
     const products = await orderService.getProducts();
     return reply.send({ success: true, data: products });
+  });
+
+  // GET /api/orders/:id/detail — Full order with pick/pack/ship
+  app.get("/:id/detail", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { prisma } = await import("@wms/db");
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        lines: { include: { product: true } },
+      },
+    });
+    if (!order)
+      return reply.status(404).send({ success: false, error: "Not found" });
+
+    const pickList = await prisma.pickList.findFirst({
+      where: { orderId: id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const packingTask = await prisma.packingTask.findFirst({
+      where: { orderId: id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const shippingLabel = await prisma.shippingLabel.findFirst({
+      where: { orderId: id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return reply.send({
+      success: true,
+      data: { ...order, pickList, packingTask, shippingLabel },
+    });
+  });
+
+  // GET /api/orders/events/recent — Recent events for feed
+  app.get("/events/recent", async (request, reply) => {
+    const { eventRepository } = await import("@wms/db");
+    const events = await eventRepository.findRecent(100);
+    return reply.send({ success: true, data: events });
   });
 
   // POST /api/orders — Create a single order
@@ -48,7 +99,16 @@ export async function orderRoutes(app: FastifyInstance) {
         items: { productId: string; quantity: number }[];
       };
 
-      const result = await orderService.create(body);
+      const { mode } = request.query as { mode?: string };
+
+      const result = await orderService.create({
+        customerName: body.customerName,
+        customerEmail: body.customerEmail,
+        priority: body.priority,
+        items: body.items,
+        manual: mode === "manual",
+      });
+
       return reply.status(201).send({
         success: true,
         data: result.order,
@@ -68,13 +128,15 @@ export async function orderRoutes(app: FastifyInstance) {
       const inStock = products.filter((p) => p.quantity > 5);
 
       if (inStock.length === 0) {
-        return reply.status(400).send({ success: false, error: "No products in stock" });
+        return reply
+          .status(400)
+          .send({ success: false, error: "No products in stock" });
       }
 
       // Pick 1-3 random products
       const itemCount = Math.min(
         Math.floor(Math.random() * 3) + 1,
-        inStock.length
+        inStock.length,
       );
       const shuffled = inStock.sort(() => Math.random() - 0.5);
       const items = shuffled.slice(0, itemCount).map((p) => ({
@@ -84,13 +146,17 @@ export async function orderRoutes(app: FastifyInstance) {
 
       const customer = CUSTOMERS[Math.floor(Math.random() * CUSTOMERS.length)];
       const priorities = ["low", "normal", "normal", "high", "critical"];
-      const priority = priorities[Math.floor(Math.random() * priorities.length)];
+      const priority =
+        priorities[Math.floor(Math.random() * priorities.length)];
+
+      const { mode } = request.query as { mode?: string };
 
       const result = await orderService.create({
         customerName: customer,
         customerEmail: `${customer.toLowerCase().replace(" ", ".")}@example.com`,
         priority,
         items,
+        manual: mode === "manual",
       });
 
       return reply.status(201).send({
@@ -117,7 +183,7 @@ export async function orderRoutes(app: FastifyInstance) {
 
         const itemCount = Math.min(
           Math.floor(Math.random() * 3) + 1,
-          inStock.length
+          inStock.length,
         );
         const shuffled = inStock.sort(() => Math.random() - 0.5);
         const items = shuffled.slice(0, itemCount).map((p) => ({
@@ -125,8 +191,11 @@ export async function orderRoutes(app: FastifyInstance) {
           quantity: Math.floor(Math.random() * 2) + 1,
         }));
 
-        const customer = CUSTOMERS[Math.floor(Math.random() * CUSTOMERS.length)];
-        const priority = ["low", "normal", "high"][Math.floor(Math.random() * 3)];
+        const customer =
+          CUSTOMERS[Math.floor(Math.random() * CUSTOMERS.length)];
+        const priority = ["low", "normal", "high"][
+          Math.floor(Math.random() * 3)
+        ];
 
         const result = await orderService.create({
           customerName: customer,

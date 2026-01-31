@@ -6,6 +6,13 @@ export const eventRepository = {
     return prisma.event.create({ data });
   },
 
+  async findRecent(limit = 100) {
+    return prisma.event.findMany({
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+  },
+
   findByCorrelationId(correlationId: string) {
     return prisma.event.findMany({
       where: { correlationId },

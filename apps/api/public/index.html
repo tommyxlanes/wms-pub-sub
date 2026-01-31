@@ -792,6 +792,11 @@
               ↻ Refresh
             </button>
           </div>
+          <div class="btn-row">
+            <button class="btn btn-g" id="modeBtn" onclick="toggleMode()">
+              🖐️ Manual
+            </button>
+          </div>
           <div class="stats">
             <div class="st">
               <div class="st-v" id="sOrders">0</div>
@@ -865,6 +870,7 @@
       let filter = "all";
       let stats = { orders: 0, fulfilled: 0, events: 0 };
       let expandedOrder = null;
+      let mode = "manual"; // 'auto' or 'manual'
 
       const STEPS = [
         "pending",
@@ -921,6 +927,7 @@
         if (ev.type === "order:created") {
           stats.orders++;
           orders.set(p.orderNumber, {
+            id: p.orderId,
             orderNumber: p.orderNumber,
             customer: p.customerName,
             amount: p.totalAmount,
@@ -943,6 +950,7 @@
         // Order status transitions
         if (
           ev.type?.startsWith("order:") &&
+          ev.type !== "order:created" &&
           p.orderNumber &&
           orders.has(p.orderNumber)
         ) {
@@ -1166,6 +1174,30 @@
               (l, i) =>
                 `<div class="o-step-lbl ${i < si ? "done" : i === si ? "cur" : ""}">${l}</div>`,
             ).join("");
+            // Action buttons based on order status
+            let actionsHtml = "";
+            if (mode === "manual") {
+              if (o.status === "pending") {
+                actionsHtml = `<div class="o-section">
+          <button class="btn btn-b" style="width:100%" onclick="doGenPicklist('${o.id}')">📋 Generate Pick List</button>
+        </div>`;
+              }
+              if (o.status === "picked" && !o.packItems.length) {
+                actionsHtml = `<div class="o-section">
+          <button class="btn btn-p" style="width:100%" onclick="doStartPacking('${o.id}')">📦 Start Packing</button>
+        </div>`;
+              }
+              if (o.status === "packed" && !o.label) {
+                actionsHtml = `<div class="o-section">
+          <button class="btn btn-b" style="width:100%" onclick="doCreateLabel('${o.id}')">🏷️ Create Shipping Label</button>
+        </div>`;
+              }
+              if (o.label && o.status === "packed") {
+                actionsHtml = `<div class="o-section">
+          <button class="btn btn-b" style="width:100%;background:#059669" onclick="doShip('${o.id}')">🚚 Ship Order</button>
+        </div>`;
+              }
+            }
 
             // Pick list section
             let pickHtml = "";
@@ -1176,12 +1208,12 @@
           .map(
             (item) => `
           <div class="pick-item">
-            <div class="pick-check ${item.picked ? "picked" : ""}"></div>
-            <span class="pick-sku mono">${item.sku}</span>
-            <span class="pick-name">${item.name}</span>
-            <span class="pick-qty mono">${item.quantity}x</span>
-            <span class="pick-loc mono">${item.location}</span>
-          </div>
+  <div class="pick-check ${item.picked ? "picked" : ""}"${!item.picked && mode === "manual" ? ` style="cursor:pointer" onclick="doPickItem('${o.id}','${item.sku}')"` : ""}></div>
+  <span class="pick-sku mono">${item.sku}</span>
+  <span class="pick-name">${item.name}</span>
+  <span class="pick-qty mono">${item.quantity}x</span>
+  <span class="pick-loc mono">${item.location}</span>
+</div>
         `,
           )
           .join("")}
@@ -1197,14 +1229,22 @@
           .map(
             (item) => `
           <div class="pack-item">
-            <div class="pack-check ${item.verified ? "verified" : ""}"></div>
-            <span class="pick-sku mono">${item.sku}</span>
-            <span class="pick-name">${item.name}</span>
-            <span class="pick-qty mono">${item.quantity}x</span>
-          </div>
+  <div class="pack-check ${item.verified ? "verified" : ""}"${!item.verified && mode === "manual" ? ` style="cursor:pointer" onclick="doVerifyItem('${o.id}','${item.sku}')"` : ""}></div>
+  <span class="pick-sku mono">${item.sku}</span>
+  <span class="pick-name">${item.name}</span>
+  <span class="pick-qty mono">${item.quantity}x</span>
+</div>
         `,
           )
           .join("")}
+          ${
+            o.packDone === o.packTotal &&
+            o.packTotal > 0 &&
+            !o.weight &&
+            mode === "manual"
+              ? `<button class="btn btn-p" style="width:100%;margin-top:8px" onclick="doCompletePacking('${o.id}')">✅ Complete Packing</button>`
+              : ""
+          }
         ${
           o.weight
             ? `
@@ -1237,7 +1277,7 @@
       </div>`;
             }
 
-            const hasDetail = pickHtml || packHtml || shipHtml;
+            const hasDetail = actionsHtml || pickHtml || packHtml || shipHtml;
 
             return `<div class="o-card ${o.status !== "completed" && o.status !== "pending" ? "active-order" : ""}">
       <div class="o-head" onclick="toggleOrder('${o.orderNumber}')">
@@ -1252,7 +1292,7 @@
         <div class="o-prog">${steps}</div>
         <div class="o-step-labels">${labels}</div>
       </div>
-      ${hasDetail ? `<div class="o-detail ${isExpanded ? "open" : ""}">${pickHtml}${packHtml}${shipHtml}</div>` : ""}
+      ${hasDetail ? `<div class="o-detail ${isExpanded ? "open" : ""}">${actionsHtml}${pickHtml}${packHtml}${shipHtml}</div>` : ""}
     </div>`;
           })
           .join("");
@@ -1360,14 +1400,79 @@
       // ACTIONS
       // ═══════════════════════════════════════════════════════════
       async function simulateOrder() {
-        await fetch(`${API}/api/orders/simulate`, { method: "POST" });
+        await fetch(`${API}/api/orders/simulate?mode=${mode}`, {
+          method: "POST",
+        });
       }
 
       async function burstOrders(n) {
         for (let i = 0; i < n; i++) {
-          await fetch(`${API}/api/orders/simulate`, { method: "POST" });
+          await fetch(`${API}/api/orders/simulate?mode=${mode}`, {
+            method: "POST",
+          });
           await new Promise((r) => setTimeout(r, 400));
         }
+      }
+
+      // ─── Manual Fulfillment Actions ───
+      async function doGenPicklist(orderId) {
+        await fetch(`${API}/api/fulfill/${orderId}/picklist`, {
+          method: "POST",
+        });
+      }
+
+      async function doPickItem(orderId, sku) {
+        await fetch(`${API}/api/fulfill/${orderId}/pick`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sku }),
+        });
+      }
+
+      async function doStartPacking(orderId) {
+        await fetch(`${API}/api/fulfill/${orderId}/pack/start`, {
+          method: "POST",
+        });
+      }
+
+      async function doVerifyItem(orderId, sku) {
+        await fetch(`${API}/api/fulfill/${orderId}/pack/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sku }),
+        });
+      }
+
+      async function doCompletePacking(orderId) {
+        const weight = +(Math.random() * 10 + 1).toFixed(2);
+        const dimensions = {
+          length: Math.round(Math.random() * 20 + 6),
+          width: Math.round(Math.random() * 15 + 4),
+          height: Math.round(Math.random() * 10 + 2),
+        };
+        await fetch(`${API}/api/fulfill/${orderId}/pack/complete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ weight, dimensions }),
+        });
+      }
+
+      async function doCreateLabel(orderId) {
+        await fetch(`${API}/api/fulfill/${orderId}/label`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+      }
+
+      async function doShip(orderId) {
+        await fetch(`${API}/api/fulfill/${orderId}/ship`, { method: "POST" });
+      }
+
+      function toggleMode() {
+        mode = mode === "auto" ? "manual" : "auto";
+        document.getElementById("modeBtn").textContent =
+          mode === "auto" ? "⚡ Auto" : "🖐️ Manual";
       }
 
       async function refreshProducts() {
@@ -1408,10 +1513,89 @@
       }
 
       // ═══════════════════════════════════════════════════════════
-      // INIT
+      // INIT — Load persisted state from DB
       // ═══════════════════════════════════════════════════════════
-      connectSSE();
-      refreshProducts();
+      async function loadOrders() {
+        try {
+          const res = await fetch(`${API}/api/orders`);
+          const data = await res.json();
+          if (!data.success) return;
+
+          for (const order of data.data) {
+            // Fetch full detail for each active order
+            const detailRes = await fetch(
+              `${API}/api/orders/${order.id}/detail`,
+            );
+            const detail = await detailRes.json();
+            if (!detail.success) continue;
+
+            const d = detail.data;
+            const pickItems = d.pickList ? d.pickList.items || [] : [];
+            const packItems = d.packingTask ? d.packingTask.items || [] : [];
+
+            orders.set(order.orderNumber, {
+              id: order.id,
+              orderNumber: order.orderNumber,
+              customer: order.customerName,
+              amount: order.totalAmount,
+              itemCount: order.lines?.length || 0,
+              priority: order.priority,
+              status: order.status,
+              pickItems,
+              packItems,
+              pickTotal: pickItems.length,
+              pickDone: pickItems.filter((i) => i.picked).length,
+              packTotal: packItems.length,
+              packDone: packItems.filter((i) => i.verified).length,
+              weight: d.packingTask?.weight || null,
+              dimensions: d.packingTask?.dimensions || null,
+              label: d.shippingLabel
+                ? {
+                    carrier: d.shippingLabel.carrier,
+                    service: d.shippingLabel.service,
+                    tracking: d.shippingLabel.trackingNumber,
+                    rate: d.shippingLabel.rate,
+                    days: d.shippingLabel.estimatedDays,
+                  }
+                : null,
+              message: null,
+            });
+
+            stats.orders++;
+            if (order.status === "completed") stats.fulfilled++;
+          }
+        } catch (e) {
+          console.error("Failed to load orders:", e);
+        }
+      }
+
+      async function loadEvents() {
+        try {
+          const res = await fetch(`${API}/api/orders/events/recent`);
+          const data = await res.json();
+          if (!data.success) return;
+
+          // Events from DB have { type, payload, createdAt }
+          events = data.data.map((e) => ({
+            type: e.type,
+            payload: e.payload,
+            timestamp: e.createdAt,
+          }));
+          stats.events = events.length;
+        } catch (e) {
+          console.error("Failed to load events:", e);
+        }
+      }
+
+      async function init() {
+        await refreshProducts();
+        await loadOrders();
+        await loadEvents();
+        renderAll();
+        connectSSE();
+      }
+
+      init();
     </script>
   </body>
 </html>

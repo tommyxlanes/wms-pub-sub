@@ -147,6 +147,9 @@ importers:
       '@wms/config':
         specifier: workspace:*
         version: link:../config
+      '@wms/db':
+        specifier: workspace:*
+        version: link:../db
       '@wms/types':
         specifier: workspace:*
         version: link:../types

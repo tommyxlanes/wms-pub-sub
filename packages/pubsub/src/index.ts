@@ -1,6 +1,7 @@
 import IORedis from "ioredis";
 import { randomUUID } from "node:crypto";
 import { env } from "@wms/config";
+
 import type { PubSubEvent, EventType } from "@wms/types";
 
 // ─── Dedicated Pub/Sub Connections ──────────────────────────
@@ -32,7 +33,9 @@ export const CHANNELS = {
 export type Channel = (typeof CHANNELS)[keyof typeof CHANNELS];
 
 // ─── Event Handler Registry ─────────────────────────────────
-type EventHandler<T = unknown> = (event: PubSubEvent<T>) => void | Promise<void>;
+type EventHandler<T = unknown> = (
+  event: PubSubEvent<T>,
+) => void | Promise<void>;
 const handlers = new Map<string, Set<EventHandler>>();
 
 // ─── Publish ────────────────────────────────────────────────
@@ -40,24 +43,39 @@ export async function publish<T>(
   channel: Channel,
   type: EventType,
   payload: T,
-  correlationId?: string
+  correlationId?: string,
 ): Promise<void> {
+  const cid = correlationId ?? randomUUID();
+
   const event: PubSubEvent<T> = {
     type,
     payload,
     timestamp: new Date().toISOString(),
-    correlationId: correlationId ?? randomUUID(),
+    correlationId: cid,
   };
+
+  // Persist to DB
+  try {
+    const { prisma } = await import("@wms/db");
+    await prisma.event.create({
+      data: {
+        type,
+        payload: payload as any,
+        correlationId: cid,
+      },
+    });
+  } catch (e) {
+    console.error("⚠️ Failed to persist event:", e);
+  }
 
   const message = JSON.stringify(event);
   await getPublisher().publish(channel, message);
-  console.log(`📡 [PUB] ${channel} → ${type} (${event.correlationId})`);
+  console.log(`📡 [PUB] ${channel} → ${type} (${cid})`);
 }
-
 // ─── Subscribe ──────────────────────────────────────────────
 export async function subscribe(
   channel: Channel,
-  handler: EventHandler
+  handler: EventHandler,
 ): Promise<void> {
   const sub = getSubscriber();
 
@@ -92,7 +110,7 @@ export async function subscribe(
 // ─── Unsubscribe ────────────────────────────────────────────
 export async function unsubscribe(
   channel: Channel,
-  handler?: EventHandler
+  handler?: EventHandler,
 ): Promise<void> {
   const channelHandlers = handlers.get(channel);
   if (!channelHandlers) return;
