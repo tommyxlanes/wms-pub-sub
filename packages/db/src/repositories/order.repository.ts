@@ -23,15 +23,21 @@ export const orderRepository = {
     });
   },
 
-  findMany(status?: string) {
+  async findMany(status?: string) {
     return prisma.order.findMany({
       where: status ? { status } : undefined,
-      include: { lines: { include: { product: true } } },
+      include: {
+        lines: { include: { product: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
   },
 
-  updateStatus(id: string, status: string, extra?: Partial<Prisma.OrderUpdateInput>) {
+  updateStatus(
+    id: string,
+    status: string,
+    extra?: Partial<Prisma.OrderUpdateInput>,
+  ) {
     return prisma.order.update({
       where: { id },
       data: { status, ...extra },

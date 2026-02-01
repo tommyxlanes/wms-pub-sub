@@ -92,6 +92,17 @@ const products = [
 ];
 
 async function main() {
+  console.log("🧹 Clearing existing data...\n");
+
+  await prisma.shippingLabel.deleteMany();
+  await prisma.packingTask.deleteMany();
+  await prisma.pickList.deleteMany();
+  await prisma.orderLine.deleteMany();
+  await prisma.order.deleteMany();
+  await prisma.event.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.product.deleteMany();
+
   console.log("🌱 Seeding products...\n");
 
   for (const product of products) {

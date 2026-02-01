@@ -1,0 +1,2451 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WMS — Architecture Reference</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: #08090d;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      import { useState } from "react";
+
+      const FONT = "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace";
+      const SANS = "'DM Sans', 'Segoe UI', sans-serif";
+
+      const colors = {
+        bg: "#08090d",
+        surface: "#0e1017",
+        border: "#1a1d2a",
+        borderHi: "#2a2e3e",
+        text: "#c8cad0",
+        textDim: "#5a5e6e",
+        textBright: "#eaebef",
+        blue: "#4d8af0",
+        blueDim: "#1d2d5a",
+        green: "#3dd68c",
+        greenDim: "#133326",
+        purple: "#9b72f0",
+        purpleDim: "#241d3a",
+        orange: "#f0a03d",
+        orangeDim: "#33261a",
+        cyan: "#3dd6c8",
+        cyanDim: "#133330",
+        red: "#f05a5a",
+        redDim: "#331a1a",
+        yellow: "#e8d44d",
+        yellowDim: "#2e2a12",
+      };
+
+      const Box = ({
+        x,
+        y,
+        w,
+        h,
+        label,
+        sublabel,
+        color,
+        icon,
+        dashed,
+        children,
+      }) => (
+        <g>
+          <rect
+            x={x}
+            y={y}
+            width={w}
+            height={h}
+            rx={6}
+            fill={
+              color === "blue"
+                ? colors.blueDim
+                : color === "green"
+                  ? colors.greenDim
+                  : color === "purple"
+                    ? colors.purpleDim
+                    : color === "orange"
+                      ? colors.orangeDim
+                      : color === "cyan"
+                        ? colors.cyanDim
+                        : color === "red"
+                          ? colors.redDim
+                          : color === "yellow"
+                            ? colors.yellowDim
+                            : colors.surface
+            }
+            stroke={
+              color === "blue"
+                ? colors.blue
+                : color === "green"
+                  ? colors.green
+                  : color === "purple"
+                    ? colors.purple
+                    : color === "orange"
+                      ? colors.orange
+                      : color === "cyan"
+                        ? colors.cyan
+                        : color === "red"
+                          ? colors.red
+                          : color === "yellow"
+                            ? colors.yellow
+                            : colors.border
+            }
+            strokeWidth={1.5}
+            strokeDasharray={dashed ? "6 3" : "none"}
+            opacity={0.9}
+          />
+          {icon && (
+            <text x={x + 12} y={y + 22} fontSize={14}>
+              {icon}
+            </text>
+          )}
+          <text
+            x={x + (icon ? 30 : 12)}
+            y={y + 22}
+            fill={
+              color === "blue"
+                ? colors.blue
+                : color === "green"
+                  ? colors.green
+                  : color === "purple"
+                    ? colors.purple
+                    : color === "orange"
+                      ? colors.orange
+                      : color === "cyan"
+                        ? colors.cyan
+                        : color === "red"
+                          ? colors.red
+                          : color === "yellow"
+                            ? colors.yellow
+                            : colors.textBright
+            }
+            fontSize={11}
+            fontWeight={700}
+            fontFamily={FONT}
+          >
+            {label}
+          </text>
+          {sublabel && (
+            <text
+              x={x + (icon ? 30 : 12)}
+              y={y + 38}
+              fill={colors.textDim}
+              fontSize={9}
+              fontFamily={FONT}
+            >
+              {sublabel}
+            </text>
+          )}
+          {children}
+        </g>
+      );
+
+      const Arrow = ({
+        x1,
+        y1,
+        x2,
+        y2,
+        color = colors.textDim,
+        label,
+        dashed,
+        bend,
+      }) => {
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+        const offset = bend || 0;
+        const path = bend
+          ? `M${x1},${y1} Q${midX},${midY + offset} ${x2},${y2}`
+          : `M${x1},${y1} L${x2},${y2}`;
+
+        return (
+          <g>
+            <defs>
+              <marker
+                id={`ah-${color.replace("#", "")}`}
+                markerWidth={8}
+                markerHeight={6}
+                refX={7}
+                refY={3}
+                orient="auto"
+              >
+                <polygon points="0 0, 8 3, 0 6" fill={color} />
+              </marker>
+            </defs>
+            <path
+              d={path}
+              fill="none"
+              stroke={color}
+              strokeWidth={1.5}
+              strokeDasharray={dashed ? "4 3" : "none"}
+              markerEnd={`url(#ah-${color.replace("#", "")})`}
+            />
+            {label && (
+              <text
+                x={midX + (bend ? 8 : 0)}
+                y={midY + (bend ? offset / 2 : -6)}
+                fill={colors.textDim}
+                fontSize={8}
+                fontFamily={FONT}
+                textAnchor="middle"
+              >
+                {label}
+              </text>
+            )}
+          </g>
+        );
+      };
+
+      // ── DIAGRAMS ──
+
+      const SystemOverview = () => (
+        <svg viewBox="0 0 920 520" style={{ width: "100%", maxWidth: 920 }}>
+          <text
+            x={460}
+            y={28}
+            fill={colors.textBright}
+            fontSize={16}
+            fontWeight={700}
+            fontFamily={SANS}
+            textAnchor="middle"
+          >
+            System Architecture Overview
+          </text>
+
+          {/* Browser */}
+          <Box
+            x={340}
+            y={50}
+            w={240}
+            h={70}
+            label="Browser Dashboard"
+            sublabel="SSE Client · Manual Controls"
+            color="blue"
+            icon="🖥️"
+          />
+
+          {/* API */}
+          <Box
+            x={340}
+            y={180}
+            w={240}
+            h={80}
+            label="Fastify API"
+            sublabel="REST Endpoints · SSE Stream"
+            color="cyan"
+            icon="⚡"
+          >
+            <text
+              x={352}
+              y={234}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              /api/orders · /api/fulfill · /events
+            </text>
+          </Box>
+
+          {/* Redis */}
+          <Box
+            x={80}
+            y={300}
+            w={200}
+            h={80}
+            label="Redis (Upstash)"
+            sublabel="Pub/Sub · BullMQ Queues"
+            color="red"
+            icon="🔴"
+          >
+            <text
+              x={92}
+              y={354}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              channel:tasks · channel:system
+            </text>
+          </Box>
+
+          {/* Worker */}
+          <Box
+            x={640}
+            y={300}
+            w={220}
+            h={80}
+            label="BullMQ Worker"
+            sublabel="Order Processor · Event Persist"
+            color="purple"
+            icon="⚙️"
+          >
+            <text
+              x={652}
+              y={354}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              auto-fulfill · persist events
+            </text>
+          </Box>
+
+          {/* Domain */}
+          <Box
+            x={340}
+            y={310}
+            w={240}
+            h={60}
+            label="Domain Services"
+            sublabel="order · fulfillment · task"
+            color="orange"
+            icon="📦"
+          />
+
+          {/* DB */}
+          <Box
+            x={340}
+            y={430}
+            w={240}
+            h={60}
+            label="PostgreSQL (Supabase)"
+            sublabel="Orders · Products · Events · Pick/Pack/Ship"
+            color="green"
+            icon="🐘"
+          />
+
+          {/* Arrows */}
+          <Arrow
+            x1={460}
+            y1={120}
+            x2={460}
+            y2={180}
+            color={colors.blue}
+            label="HTTP + SSE"
+          />
+          <Arrow
+            x1={390}
+            y1={260}
+            x2={250}
+            y2={300}
+            color={colors.cyan}
+            label="subscribe"
+          />
+          <Arrow
+            x1={180}
+            y1={300}
+            x2={410}
+            y2={260}
+            color={colors.red}
+            label="SSE relay"
+            dashed
+          />
+          <Arrow
+            x1={280}
+            y1={340}
+            x2={340}
+            y2={340}
+            color={colors.red}
+            label=""
+          />
+          <Arrow
+            x1={580}
+            y1={340}
+            x2={640}
+            y2={340}
+            color={colors.red}
+            label=""
+          />
+          <Arrow
+            x1={460}
+            y1={370}
+            x2={460}
+            y2={430}
+            color={colors.orange}
+            label="Prisma ORM"
+          />
+          <Arrow
+            x1={750}
+            y1={380}
+            x2={750}
+            y2={450}
+            color={colors.purple}
+            dashed
+          />
+          <Arrow
+            x1={750}
+            y1={450}
+            x2={580}
+            y2={460}
+            color={colors.purple}
+            label="persist"
+            dashed
+          />
+
+          {/* Labels */}
+          <text
+            x={130}
+            y={290}
+            fill={colors.red}
+            fontSize={8}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            pub/sub
+          </text>
+          <text
+            x={610}
+            y={290}
+            fill={colors.purple}
+            fontSize={8}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            job queue
+          </text>
+        </svg>
+      );
+
+      const EventFlowDiagram = () => (
+        <svg viewBox="0 0 920 560" style={{ width: "100%", maxWidth: 920 }}>
+          <text
+            x={460}
+            y={28}
+            fill={colors.textBright}
+            fontSize={16}
+            fontWeight={700}
+            fontFamily={SANS}
+            textAnchor="middle"
+          >
+            Event Flow — Manual Fulfillment
+          </text>
+
+          {/* Timeline */}
+          <line
+            x1={100}
+            y1={70}
+            x2={100}
+            y2={540}
+            stroke={colors.border}
+            strokeWidth={2}
+          />
+          <text
+            x={100}
+            y={58}
+            fill={colors.textDim}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            BROWSER
+          </text>
+
+          <line
+            x1={320}
+            y1={70}
+            x2={320}
+            y2={540}
+            stroke={colors.border}
+            strokeWidth={2}
+          />
+          <text
+            x={320}
+            y={58}
+            fill={colors.textDim}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            API
+          </text>
+
+          <line
+            x1={540}
+            y1={70}
+            x2={540}
+            y2={540}
+            stroke={colors.border}
+            strokeWidth={2}
+          />
+          <text
+            x={540}
+            y={58}
+            fill={colors.textDim}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            DOMAIN
+          </text>
+
+          <line
+            x1={720}
+            y1={70}
+            x2={720}
+            y2={540}
+            stroke={colors.border}
+            strokeWidth={2}
+          />
+          <text
+            x={720}
+            y={58}
+            fill={colors.textDim}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            REDIS
+          </text>
+
+          <line
+            x1={860}
+            y1={70}
+            x2={860}
+            y2={540}
+            stroke={colors.border}
+            strokeWidth={2}
+          />
+          <text
+            x={860}
+            y={58}
+            fill={colors.textDim}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            DB
+          </text>
+
+          {/* Step 1 */}
+          <rect
+            x={30}
+            y={80}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.blueDim}
+            stroke={colors.blue}
+            strokeWidth={1}
+          />
+          <text
+            x={100}
+            y={96}
+            fill={colors.blue}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            + New Order (manual)
+          </text>
+          <Arrow x1={170} y1={92} x2={310} y2={92} color={colors.blue} />
+          <text
+            x={240}
+            y={86}
+            fill={colors.textDim}
+            fontSize={7}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            POST /simulate?mode=manual
+          </text>
+
+          {/* Step 2 */}
+          <Arrow x1={330} y1={92} x2={530} y2={112} color={colors.cyan} />
+          <rect
+            x={470}
+            y={105}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.orangeDim}
+            stroke={colors.orange}
+            strokeWidth={1}
+          />
+          <text
+            x={540}
+            y={121}
+            fill={colors.orange}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            orderService.create()
+          </text>
+          <Arrow x1={610} y1={117} x2={850} y2={127} color={colors.orange} />
+          <text
+            x={730}
+            y={118}
+            fill={colors.textDim}
+            fontSize={7}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            INSERT order + reserve
+          </text>
+          <Arrow x1={610} y1={125} x2={710} y2={140} color={colors.orange} />
+          <text
+            x={660}
+            y={148}
+            fill={colors.textDim}
+            fontSize={7}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            publish order:created
+          </text>
+
+          {/* Step 3: SSE back */}
+          <Arrow
+            x1={710}
+            y1={150}
+            x2={310}
+            y2={165}
+            color={colors.red}
+            dashed
+          />
+          <Arrow
+            x1={310}
+            y1={170}
+            x2={170}
+            y2={175}
+            color={colors.blue}
+            dashed
+          />
+          <text
+            x={380}
+            y={162}
+            fill={colors.red}
+            fontSize={7}
+            fontFamily={FONT}
+          >
+            SSE → order card appears
+          </text>
+
+          {/* Step 4: Gen Pick List */}
+          <rect
+            x={30}
+            y={195}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.yellowDim}
+            stroke={colors.yellow}
+            strokeWidth={1}
+          />
+          <text
+            x={100}
+            y={211}
+            fill={colors.yellow}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            📋 Gen Pick List
+          </text>
+          <Arrow x1={170} y1={207} x2={310} y2={207} color={colors.yellow} />
+          <text
+            x={240}
+            y={200}
+            fill={colors.textDim}
+            fontSize={7}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            POST /fulfill/:id/picklist
+          </text>
+          <Arrow x1={330} y1={207} x2={530} y2={222} color={colors.cyan} />
+          <rect
+            x={470}
+            y={215}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.orangeDim}
+            stroke={colors.orange}
+            strokeWidth={1}
+          />
+          <text
+            x={540}
+            y={231}
+            fill={colors.orange}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            generatePickList()
+          </text>
+          <Arrow x1={610} y1={230} x2={710} y2={245} color={colors.orange} />
+
+          {/* Step 5: Pick Items */}
+          <rect
+            x={30}
+            y={265}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.yellowDim}
+            stroke={colors.yellow}
+            strokeWidth={1}
+          />
+          <text
+            x={100}
+            y={281}
+            fill={colors.yellow}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            ☑️ Pick Item (×N)
+          </text>
+          <Arrow x1={170} y1={277} x2={310} y2={277} color={colors.yellow} />
+          <Arrow x1={330} y1={277} x2={530} y2={290} color={colors.cyan} />
+          <rect
+            x={470}
+            y={283}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.orangeDim}
+            stroke={colors.orange}
+            strokeWidth={1}
+          />
+          <text
+            x={540}
+            y={299}
+            fill={colors.orange}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            pickItem() → auto-complete
+          </text>
+          <Arrow x1={610} y1={300} x2={710} y2={312} color={colors.orange} />
+
+          {/* Step 6: Start Packing */}
+          <rect
+            x={30}
+            y={335}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.purpleDim}
+            stroke={colors.purple}
+            strokeWidth={1}
+          />
+          <text
+            x={100}
+            y={351}
+            fill={colors.purple}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            📦 Start Packing
+          </text>
+          <Arrow x1={170} y1={347} x2={530} y2={365} color={colors.purple} />
+          <rect
+            x={470}
+            y={358}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.orangeDim}
+            stroke={colors.orange}
+            strokeWidth={1}
+          />
+          <text
+            x={540}
+            y={374}
+            fill={colors.orange}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            startPacking() → verify
+          </text>
+
+          {/* Step 7: Label + Ship */}
+          <rect
+            x={30}
+            y={400}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.cyanDim}
+            stroke={colors.cyan}
+            strokeWidth={1}
+          />
+          <text
+            x={100}
+            y={416}
+            fill={colors.cyan}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            🏷️ Create Label
+          </text>
+          <Arrow x1={170} y1={412} x2={530} y2={428} color={colors.cyan} />
+          <rect
+            x={470}
+            y={421}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.orangeDim}
+            stroke={colors.orange}
+            strokeWidth={1}
+          />
+          <text
+            x={540}
+            y={437}
+            fill={colors.orange}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            createLabel()
+          </text>
+          <Arrow x1={610} y1={438} x2={850} y2={445} color={colors.orange} />
+
+          <rect
+            x={30}
+            y={465}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.greenDim}
+            stroke={colors.green}
+            strokeWidth={1}
+          />
+          <text
+            x={100}
+            y={481}
+            fill={colors.green}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            🚚 Ship Order
+          </text>
+          <Arrow x1={170} y1={477} x2={530} y2={492} color={colors.green} />
+          <rect
+            x={470}
+            y={485}
+            width={140}
+            height={24}
+            rx={3}
+            fill={colors.orangeDim}
+            stroke={colors.orange}
+            strokeWidth={1}
+          />
+          <text
+            x={540}
+            y={501}
+            fill={colors.orange}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            shipOrder() → complete
+          </text>
+          <Arrow x1={610} y1={500} x2={710} y2={510} color={colors.green} />
+
+          {/* Final SSE */}
+          <Arrow
+            x1={710}
+            y1={515}
+            x2={170}
+            y2={525}
+            color={colors.green}
+            dashed
+          />
+          <text
+            x={400}
+            y={536}
+            fill={colors.green}
+            fontSize={8}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            ✅ order:completed → UI updates
+          </text>
+        </svg>
+      );
+
+      const DataModelDiagram = () => (
+        <svg viewBox="0 0 920 440" style={{ width: "100%", maxWidth: 920 }}>
+          <text
+            x={460}
+            y={28}
+            fill={colors.textBright}
+            fontSize={16}
+            fontWeight={700}
+            fontFamily={SANS}
+            textAnchor="middle"
+          >
+            Data Model (Prisma Schema)
+          </text>
+
+          {/* Product */}
+          <Box
+            x={20}
+            y={60}
+            w={170}
+            h={130}
+            label="Product"
+            color="green"
+            icon="📦"
+          >
+            <text
+              x={32}
+              y={96}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              id cuid
+            </text>
+            <text
+              x={32}
+              y={110}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              sku String @unique
+            </text>
+            <text
+              x={32}
+              y={124}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              name String
+            </text>
+            <text
+              x={32}
+              y={138}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              price Float
+            </text>
+            <text
+              x={32}
+              y={152}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              quantity Int
+            </text>
+            <text
+              x={32}
+              y={166}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              reserved Int
+            </text>
+            <text
+              x={32}
+              y={180}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              location String
+            </text>
+          </Box>
+
+          {/* Order */}
+          <Box
+            x={240}
+            y={60}
+            w={180}
+            h={140}
+            label="Order"
+            color="blue"
+            icon="🛒"
+          >
+            <text
+              x={252}
+              y={96}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              id cuid
+            </text>
+            <text
+              x={252}
+              y={110}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              orderNumber String @unique
+            </text>
+            <text
+              x={252}
+              y={124}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              status String
+            </text>
+            <text
+              x={252}
+              y={138}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              customerName String
+            </text>
+            <text
+              x={252}
+              y={152}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              totalAmount Float
+            </text>
+            <text
+              x={252}
+              y={166}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              priority String
+            </text>
+            <text
+              x={252}
+              y={180}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              processedAt DateTime?
+            </text>
+            <text
+              x={252}
+              y={194}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              shippedAt DateTime?
+            </text>
+          </Box>
+
+          {/* OrderLine */}
+          <Box
+            x={130}
+            y={260}
+            w={160}
+            h={100}
+            label="OrderLine"
+            color="cyan"
+            icon="📝"
+          >
+            <text
+              x={142}
+              y={296}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              orderId → Order
+            </text>
+            <text
+              x={142}
+              y={310}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              productId → Product
+            </text>
+            <text
+              x={142}
+              y={324}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              quantity Int
+            </text>
+            <text
+              x={142}
+              y={338}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              price Float
+            </text>
+            <text
+              x={142}
+              y={352}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              picked Boolean
+            </text>
+          </Box>
+
+          {/* PickList */}
+          <Box
+            x={470}
+            y={60}
+            w={170}
+            h={120}
+            label="PickList"
+            color="yellow"
+            icon="📋"
+          >
+            <text
+              x={482}
+              y={96}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              orderId String
+            </text>
+            <text
+              x={482}
+              y={110}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              status String
+            </text>
+            <text
+              x={482}
+              y={124}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              items Json[]
+            </text>
+            <text
+              x={482}
+              y={138}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              {" "}
+              sku, name, qty,
+            </text>
+            <text
+              x={482}
+              y={152}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              {" "}
+              location, picked
+            </text>
+            <text
+              x={482}
+              y={166}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              assignedTo String?
+            </text>
+          </Box>
+
+          {/* PackingTask */}
+          <Box
+            x={470}
+            y={210}
+            w={170}
+            h={120}
+            label="PackingTask"
+            color="purple"
+            icon="📦"
+          >
+            <text
+              x={482}
+              y={246}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              orderId String
+            </text>
+            <text
+              x={482}
+              y={260}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              status String
+            </text>
+            <text
+              x={482}
+              y={274}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              items Json[]
+            </text>
+            <text
+              x={482}
+              y={288}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              {" "}
+              sku, verified
+            </text>
+            <text
+              x={482}
+              y={302}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              weight Float?
+            </text>
+            <text
+              x={482}
+              y={316}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              dimensions Json?
+            </text>
+          </Box>
+
+          {/* ShippingLabel */}
+          <Box
+            x={700}
+            y={60}
+            w={190}
+            h={130}
+            label="ShippingLabel"
+            color="cyan"
+            icon="🏷️"
+          >
+            <text
+              x={712}
+              y={96}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              orderId String
+            </text>
+            <text
+              x={712}
+              y={110}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              carrier String
+            </text>
+            <text
+              x={712}
+              y={124}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              service String
+            </text>
+            <text
+              x={712}
+              y={138}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              trackingNumber String
+            </text>
+            <text
+              x={712}
+              y={152}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              rate Float
+            </text>
+            <text
+              x={712}
+              y={166}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              estimatedDays Int
+            </text>
+            <text
+              x={712}
+              y={180}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              labelUrl String?
+            </text>
+          </Box>
+
+          {/* Event */}
+          <Box
+            x={700}
+            y={230}
+            w={190}
+            h={100}
+            label="Event"
+            color="red"
+            icon="📡"
+          >
+            <text
+              x={712}
+              y={266}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              type String
+            </text>
+            <text
+              x={712}
+              y={280}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              payload Json
+            </text>
+            <text
+              x={712}
+              y={294}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              correlationId String
+            </text>
+            <text
+              x={712}
+              y={308}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              processed Boolean
+            </text>
+            <text
+              x={712}
+              y={322}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              createdAt DateTime
+            </text>
+          </Box>
+
+          {/* Relation arrows */}
+          <Arrow
+            x1={240}
+            y1={200}
+            x2={210}
+            y2={260}
+            color={colors.cyan}
+            label="1:N"
+          />
+          <Arrow
+            x1={105}
+            y1={190}
+            x2={140}
+            y2={260}
+            color={colors.green}
+            label="1:N"
+            bend={-20}
+          />
+          <Arrow
+            x1={420}
+            y1={100}
+            x2={470}
+            y2={100}
+            color={colors.yellow}
+            label="1:1"
+          />
+          <Arrow
+            x1={420}
+            y1={140}
+            x2={470}
+            y2={260}
+            color={colors.purple}
+            label="1:1"
+            bend={30}
+          />
+          <Arrow
+            x1={640}
+            y1={100}
+            x2={700}
+            y2={100}
+            color={colors.cyan}
+            label="1:1"
+          />
+        </svg>
+      );
+
+      const MonorepoStructure = () => (
+        <svg viewBox="0 0 920 460" style={{ width: "100%", maxWidth: 920 }}>
+          <text
+            x={460}
+            y={28}
+            fill={colors.textBright}
+            fontSize={16}
+            fontWeight={700}
+            fontFamily={SANS}
+            textAnchor="middle"
+          >
+            Monorepo Structure
+          </text>
+
+          {/* Root */}
+          <Box
+            x={360}
+            y={50}
+            w={200}
+            h={36}
+            label="pubsub-workers/"
+            color="blue"
+            icon="📁"
+          />
+
+          {/* Apps */}
+          <Box
+            x={60}
+            y={130}
+            w={180}
+            h={36}
+            label="apps/api"
+            sublabel=""
+            color="cyan"
+            icon="⚡"
+          />
+          <Box x={60} y={180} w={180} h={76} label="" color="">
+            <text
+              x={72}
+              y={196}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/server.ts
+            </text>
+            <text
+              x={72}
+              y={210}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/app.ts
+            </text>
+            <text
+              x={72}
+              y={224}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/routes/orders.routes.ts
+            </text>
+            <text
+              x={72}
+              y={238}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/routes/fulfillment.routes.ts
+            </text>
+            <text
+              x={72}
+              y={252}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              public/index.html
+            </text>
+          </Box>
+
+          <Box
+            x={60}
+            y={280}
+            w={180}
+            h={36}
+            label="apps/worker"
+            sublabel=""
+            color="purple"
+            icon="⚙️"
+          />
+          <Box x={60} y={330} w={180} h={56} label="" color="">
+            <text
+              x={72}
+              y={346}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/worker.ts
+            </text>
+            <text
+              x={72}
+              y={360}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/processors/order.processor.ts
+            </text>
+            <text
+              x={72}
+              y={374}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/processors/task.processor.ts
+            </text>
+          </Box>
+
+          {/* Packages */}
+          <Box
+            x={320}
+            y={130}
+            w={140}
+            h={36}
+            label="packages/db"
+            color="green"
+            icon="🐘"
+          />
+          <Box x={320} y={180} w={140} h={76} label="" color="">
+            <text
+              x={332}
+              y={196}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              prisma/schema.prisma
+            </text>
+            <text
+              x={332}
+              y={210}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              prisma/seed.ts
+            </text>
+            <text
+              x={332}
+              y={224}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/client.ts
+            </text>
+            <text
+              x={332}
+              y={238}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/repositories/
+            </text>
+            <text
+              x={332}
+              y={252}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              {" "}
+              order, product, task...
+            </text>
+          </Box>
+
+          <Box
+            x={320}
+            y={280}
+            w={140}
+            h={36}
+            label="packages/domain"
+            color="orange"
+            icon="📦"
+          />
+          <Box x={320} y={330} w={140} h={50} label="" color="">
+            <text
+              x={332}
+              y={346}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/services/
+            </text>
+            <text
+              x={332}
+              y={360}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              {" "}
+              order.service.ts
+            </text>
+            <text
+              x={332}
+              y={374}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              {" "}
+              fulfillment.service.ts
+            </text>
+          </Box>
+
+          <Box
+            x={540}
+            y={130}
+            w={140}
+            h={36}
+            label="packages/pubsub"
+            color="red"
+            icon="📡"
+          />
+          <Box x={540} y={180} w={140} h={40} label="" color="">
+            <text
+              x={552}
+              y={196}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/index.ts
+            </text>
+            <text
+              x={552}
+              y={210}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              publish, subscribe, CHANNELS
+            </text>
+          </Box>
+
+          <Box
+            x={540}
+            y={240}
+            w={140}
+            h={36}
+            label="packages/queue"
+            color="purple"
+            icon="📬"
+          />
+          <Box x={540} y={290} w={140} h={30} label="" color="">
+            <text
+              x={552}
+              y={306}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/index.ts — enqueueTask
+            </text>
+          </Box>
+
+          <Box
+            x={540}
+            y={340}
+            w={140}
+            h={36}
+            label="packages/types"
+            color="yellow"
+            icon="📐"
+          />
+          <Box x={540} y={390} w={140} h={30} label="" color="">
+            <text
+              x={552}
+              y={406}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/index.ts — EventType, etc
+            </text>
+          </Box>
+
+          <Box
+            x={740}
+            y={130}
+            w={140}
+            h={36}
+            label="packages/config"
+            color=""
+            icon="⚙️"
+          />
+          <Box x={740} y={180} w={140} h={30} label="" color="">
+            <text
+              x={752}
+              y={196}
+              fill={colors.textDim}
+              fontSize={8}
+              fontFamily={FONT}
+            >
+              src/env.ts — env vars
+            </text>
+          </Box>
+
+          {/* Dep arrows */}
+          <Arrow x1={360} y1={86} x2={150} y2={130} color={colors.border} />
+          <Arrow x1={460} y1={86} x2={610} y2={130} color={colors.border} />
+          <Arrow x1={390} y1={86} x2={390} y2={130} color={colors.border} />
+        </svg>
+      );
+
+      const EventTypes = () => {
+        const events = [
+          {
+            type: "order:created",
+            source: "orderService",
+            badge: "ORDER",
+            color: colors.blue,
+            desc: "New order placed, inventory reserved",
+          },
+          {
+            type: "order:processing",
+            source: "fulfillmentService",
+            badge: "PROC",
+            color: colors.green,
+            desc: "Pick list generated, processing started",
+          },
+          {
+            type: "picklist:generated",
+            source: "fulfillmentService",
+            badge: "PLIST",
+            color: colors.yellow,
+            desc: "Pick list created with items + locations",
+          },
+          {
+            type: "picklist:item_picked",
+            source: "fulfillmentService",
+            badge: "SCAN",
+            color: colors.yellow,
+            desc: "Single item scanned/picked from location",
+          },
+          {
+            type: "picklist:completed",
+            source: "fulfillmentService",
+            badge: "PICK✓",
+            color: colors.yellow,
+            desc: "All items picked, order → picked",
+          },
+          {
+            type: "order:picked",
+            source: "fulfillmentService",
+            badge: "PICKD",
+            color: colors.yellow,
+            desc: "Order status → picked",
+          },
+          {
+            type: "packing:started",
+            source: "fulfillmentService",
+            badge: "PACK",
+            color: colors.purple,
+            desc: "Packing task created from pick list",
+          },
+          {
+            type: "packing:item_verified",
+            source: "fulfillmentService",
+            badge: "VRFY",
+            color: colors.purple,
+            desc: "Item verified during packing",
+          },
+          {
+            type: "packing:completed",
+            source: "fulfillmentService",
+            badge: "PACK✓",
+            color: colors.purple,
+            desc: "All items verified, weight + dims recorded",
+          },
+          {
+            type: "order:packed",
+            source: "fulfillmentService",
+            badge: "PACKD",
+            color: colors.purple,
+            desc: "Order status → packed",
+          },
+          {
+            type: "shipping:label_created",
+            source: "fulfillmentService",
+            badge: "LABEL",
+            color: colors.cyan,
+            desc: "Carrier selected, tracking # generated",
+          },
+          {
+            type: "order:shipped",
+            source: "fulfillmentService",
+            badge: "SHIP",
+            color: colors.cyan,
+            desc: "Reserved inventory released",
+          },
+          {
+            type: "order:completed",
+            source: "fulfillmentService",
+            badge: "DONE",
+            color: colors.green,
+            desc: "Fulfillment complete",
+          },
+          {
+            type: "inventory:updated",
+            source: "orderService",
+            badge: "INV",
+            color: colors.orange,
+            desc: "Stock quantity or reserved changed",
+          },
+        ];
+
+        return (
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontFamily: FONT,
+                fontSize: 11,
+              }}
+            >
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
+                  <th
+                    style={{
+                      padding: "8px 12px",
+                      textAlign: "left",
+                      color: colors.textDim,
+                      fontSize: 9,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Event Type
+                  </th>
+                  <th
+                    style={{
+                      padding: "8px 12px",
+                      textAlign: "left",
+                      color: colors.textDim,
+                      fontSize: 9,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Badge
+                  </th>
+                  <th
+                    style={{
+                      padding: "8px 12px",
+                      textAlign: "left",
+                      color: colors.textDim,
+                      fontSize: 9,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Source
+                  </th>
+                  <th
+                    style={{
+                      padding: "8px 12px",
+                      textAlign: "left",
+                      color: colors.textDim,
+                      fontSize: 9,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Description
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((e, i) => (
+                  <tr
+                    key={i}
+                    style={{ borderBottom: `1px solid ${colors.border}` }}
+                  >
+                    <td
+                      style={{
+                        padding: "6px 12px",
+                        color: e.color,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {e.type}
+                    </td>
+                    <td style={{ padding: "6px 12px" }}>
+                      <span
+                        style={{
+                          padding: "2px 6px",
+                          borderRadius: 3,
+                          fontSize: 8,
+                          fontWeight: 700,
+                          background: e.color + "22",
+                          color: e.color,
+                        }}
+                      >
+                        {e.badge}
+                      </span>
+                    </td>
+                    <td style={{ padding: "6px 12px", color: colors.textDim }}>
+                      {e.source}
+                    </td>
+                    <td style={{ padding: "6px 12px", color: colors.text }}>
+                      {e.desc}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      };
+
+      const ApiEndpoints = () => {
+        const endpoints = [
+          {
+            method: "GET",
+            path: "/api/orders",
+            desc: "List all orders (optional ?status=)",
+            color: colors.green,
+          },
+          {
+            method: "GET",
+            path: "/api/orders/stats",
+            desc: "Dashboard stats",
+            color: colors.green,
+          },
+          {
+            method: "GET",
+            path: "/api/orders/products",
+            desc: "List all products with stock",
+            color: colors.green,
+          },
+          {
+            method: "GET",
+            path: "/api/orders/events/recent",
+            desc: "Recent 100 events from DB",
+            color: colors.green,
+          },
+          {
+            method: "GET",
+            path: "/api/orders/:id",
+            desc: "Get order by ID",
+            color: colors.green,
+          },
+          {
+            method: "GET",
+            path: "/api/orders/:id/detail",
+            desc: "Full order + pick/pack/ship",
+            color: colors.green,
+          },
+          {
+            method: "POST",
+            path: "/api/orders",
+            desc: "Create order (body: items, customer)",
+            color: colors.blue,
+          },
+          {
+            method: "POST",
+            path: "/api/orders/simulate",
+            desc: "Random order (?mode=manual)",
+            color: colors.blue,
+          },
+          {
+            method: "POST",
+            path: "/api/orders/simulate/burst",
+            desc: "Multiple random orders (?count=5)",
+            color: colors.blue,
+          },
+          {
+            method: "POST",
+            path: "/api/fulfill/:id/picklist",
+            desc: "Generate pick list",
+            color: colors.yellow,
+          },
+          {
+            method: "POST",
+            path: "/api/fulfill/:id/pick",
+            desc: "Pick single item (body: {sku})",
+            color: colors.yellow,
+          },
+          {
+            method: "POST",
+            path: "/api/fulfill/:id/pack/start",
+            desc: "Start packing task",
+            color: colors.purple,
+          },
+          {
+            method: "POST",
+            path: "/api/fulfill/:id/pack/verify",
+            desc: "Verify pack item (body: {sku})",
+            color: colors.purple,
+          },
+          {
+            method: "POST",
+            path: "/api/fulfill/:id/pack/complete",
+            desc: "Complete packing (body: weight, dims)",
+            color: colors.purple,
+          },
+          {
+            method: "POST",
+            path: "/api/fulfill/:id/label",
+            desc: "Create shipping label",
+            color: colors.cyan,
+          },
+          {
+            method: "POST",
+            path: "/api/fulfill/:id/ship",
+            desc: "Ship order → complete",
+            color: colors.cyan,
+          },
+          {
+            method: "GET",
+            path: "/events",
+            desc: "SSE stream (Server-Sent Events)",
+            color: colors.red,
+          },
+        ];
+
+        return (
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontFamily: FONT,
+                fontSize: 11,
+              }}
+            >
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
+                  <th
+                    style={{
+                      padding: "8px 12px",
+                      textAlign: "left",
+                      color: colors.textDim,
+                      fontSize: 9,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      width: 60,
+                    }}
+                  >
+                    Method
+                  </th>
+                  <th
+                    style={{
+                      padding: "8px 12px",
+                      textAlign: "left",
+                      color: colors.textDim,
+                      fontSize: 9,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Path
+                  </th>
+                  <th
+                    style={{
+                      padding: "8px 12px",
+                      textAlign: "left",
+                      color: colors.textDim,
+                      fontSize: 9,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Description
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {endpoints.map((e, i) => (
+                  <tr
+                    key={i}
+                    style={{ borderBottom: `1px solid ${colors.border}` }}
+                  >
+                    <td style={{ padding: "5px 12px" }}>
+                      <span
+                        style={{
+                          padding: "2px 6px",
+                          borderRadius: 3,
+                          fontSize: 9,
+                          fontWeight: 700,
+                          background:
+                            e.method === "GET"
+                              ? colors.greenDim
+                              : colors.blueDim,
+                          color:
+                            e.method === "GET" ? colors.green : colors.blue,
+                        }}
+                      >
+                        {e.method}
+                      </span>
+                    </td>
+                    <td
+                      style={{
+                        padding: "5px 12px",
+                        color: e.color,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {e.path}
+                    </td>
+                    <td style={{ padding: "5px 12px", color: colors.text }}>
+                      {e.desc}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      };
+
+      const FulfillmentPipeline = () => (
+        <svg viewBox="0 0 920 200" style={{ width: "100%", maxWidth: 920 }}>
+          <text
+            x={460}
+            y={24}
+            fill={colors.textBright}
+            fontSize={16}
+            fontWeight={700}
+            fontFamily={SANS}
+            textAnchor="middle"
+          >
+            Fulfillment Pipeline
+          </text>
+
+          {/* Steps */}
+          {[
+            {
+              x: 20,
+              label: "PENDING",
+              sub: "Order created",
+              color: colors.blue,
+              icon: "🛒",
+            },
+            {
+              x: 150,
+              label: "PROCESSING",
+              sub: "Pick list gen",
+              color: colors.green,
+              icon: "⚡",
+            },
+            {
+              x: 280,
+              label: "PICKING",
+              sub: "Scan items",
+              color: colors.yellow,
+              icon: "📋",
+            },
+            {
+              x: 410,
+              label: "PICKED",
+              sub: "All scanned",
+              color: colors.yellow,
+              icon: "✅",
+            },
+            {
+              x: 540,
+              label: "PACKED",
+              sub: "Verified + weighed",
+              color: colors.purple,
+              icon: "📦",
+            },
+            {
+              x: 670,
+              label: "SHIPPED",
+              sub: "Label + dispatch",
+              color: colors.cyan,
+              icon: "🚚",
+            },
+            {
+              x: 800,
+              label: "COMPLETED",
+              sub: "Inventory released",
+              color: colors.green,
+              icon: "🎉",
+            },
+          ].map((step, i) => (
+            <g key={i}>
+              <rect
+                x={step.x}
+                y={50}
+                width={110}
+                height={70}
+                rx={6}
+                fill={step.color + "15"}
+                stroke={step.color}
+                strokeWidth={1.5}
+              />
+              <text
+                x={step.x + 55}
+                y={72}
+                fill={step.color}
+                fontSize={10}
+                fontWeight={700}
+                fontFamily={FONT}
+                textAnchor="middle"
+              >
+                {step.icon}
+              </text>
+              <text
+                x={step.x + 55}
+                y={90}
+                fill={step.color}
+                fontSize={9}
+                fontWeight={700}
+                fontFamily={FONT}
+                textAnchor="middle"
+              >
+                {step.label}
+              </text>
+              <text
+                x={step.x + 55}
+                y={106}
+                fill={colors.textDim}
+                fontSize={8}
+                fontFamily={FONT}
+                textAnchor="middle"
+              >
+                {step.sub}
+              </text>
+              {i < 6 && (
+                <Arrow
+                  x1={step.x + 112}
+                  y1={85}
+                  x2={step.x + 128}
+                  y2={85}
+                  color={colors.textDim}
+                />
+              )}
+            </g>
+          ))}
+
+          {/* Mode labels */}
+          <rect
+            x={20}
+            y={145}
+            width={430}
+            height={28}
+            rx={4}
+            fill={colors.yellowDim}
+            stroke={colors.yellow}
+            strokeWidth={1}
+            strokeDasharray="4 2"
+          />
+          <text
+            x={235}
+            y={164}
+            fill={colors.yellow}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            🖐️ MANUAL MODE — User clicks through each step via dashboard
+          </text>
+
+          <rect
+            x={470}
+            y={145}
+            width={430}
+            height={28}
+            rx={4}
+            fill={colors.purpleDim}
+            stroke={colors.purple}
+            strokeWidth={1}
+            strokeDasharray="4 2"
+          />
+          <text
+            x={685}
+            y={164}
+            fill={colors.purple}
+            fontSize={9}
+            fontFamily={FONT}
+            textAnchor="middle"
+          >
+            ⚡ AUTO MODE — BullMQ worker processes all steps automatically
+          </text>
+        </svg>
+      );
+
+      const TABS = [
+        { id: "overview", label: "Architecture" },
+        { id: "flow", label: "Event Flow" },
+        { id: "pipeline", label: "Pipeline" },
+        { id: "data", label: "Data Model" },
+        { id: "repo", label: "Monorepo" },
+        { id: "events", label: "Event Types" },
+        { id: "api", label: "API Routes" },
+      ];
+
+      export default function App() {
+        const [tab, setTab] = useState("overview");
+
+        return (
+          <div
+            style={{
+              background: colors.bg,
+              color: colors.text,
+              minHeight: "100vh",
+              fontFamily: SANS,
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "20px 24px 0",
+                borderBottom: `1px solid ${colors.border}`,
+              }}
+            >
+              <h1
+                style={{
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: colors.textBright,
+                  marginBottom: 4,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                📦 WMS Pub/Sub Architecture
+              </h1>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: colors.textDim,
+                  marginBottom: 16,
+                }}
+              >
+                Fastify · Redis Pub/Sub · BullMQ · Prisma · SSE · TypeScript
+                Monorepo
+              </p>
+
+              {/* Tabs */}
+              <div style={{ display: "flex", gap: 0, overflowX: "auto" }}>
+                {TABS.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    style={{
+                      padding: "8px 16px",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      fontFamily: FONT,
+                      color: tab === t.id ? colors.blue : colors.textDim,
+                      background: "none",
+                      border: "none",
+                      borderBottom: `2px solid ${tab === t.id ? colors.blue : "transparent"}`,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: 24, maxWidth: 960, margin: "0 auto" }}>
+              {tab === "overview" && <SystemOverview />}
+              {tab === "flow" && <EventFlowDiagram />}
+              {tab === "pipeline" && <FulfillmentPipeline />}
+              {tab === "data" && <DataModelDiagram />}
+              {tab === "repo" && <MonorepoStructure />}
+              {tab === "events" && (
+                <div>
+                  <h2
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: colors.textBright,
+                      marginBottom: 16,
+                    }}
+                  >
+                    Event Types Reference
+                  </h2>
+                  <EventTypes />
+                </div>
+              )}
+              {tab === "api" && (
+                <div>
+                  <h2
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: colors.textBright,
+                      marginBottom: 16,
+                    }}
+                  >
+                    API Endpoints Reference
+                  </h2>
+                  <ApiEndpoints />
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+    </script>
+  </body>
+</html>

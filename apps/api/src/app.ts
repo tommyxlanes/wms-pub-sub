@@ -4,6 +4,8 @@ import fastifyStatic from "@fastify/static";
 import path from "node:path";
 import { taskRoutes } from "./routes/tasks.routes.js";
 import { orderRoutes } from "./routes/orders.routes.js";
+import { fulfillmentRoutes } from "./routes/fulfillment.routes.js";
+
 import { ssePlugin } from "./plugins/sse.plugin.js";
 
 export async function buildApp() {
@@ -37,6 +39,7 @@ export async function buildApp() {
   // Routes
   await app.register(taskRoutes, { prefix: "/api/tasks" });
   await app.register(orderRoutes, { prefix: "/api/orders" });
+  await app.register(fulfillmentRoutes, { prefix: "/api/fulfill" });
 
   return app;
 }

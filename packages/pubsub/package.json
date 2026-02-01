@@ -18,6 +18,7 @@
   "dependencies": {
     "@wms/config": "workspace:*",
     "@wms/types": "workspace:*",
+    "@wms/db": "workspace:*",
     "ioredis": "^5.4.0"
   },
   "devDependencies": {
